@@ -72,13 +72,13 @@ class RigidBody extends Trait {
 
 		if (shape == Shape.Box) {
 			_shape = new oimo.physics.collision.shape.BoxShape(shapeConfig, 
-				withMargin(transform.size.x),
-				withMargin(transform.size.y),
-				withMargin(transform.size.z));
+				withMargin(transform.dim.x),
+				withMargin(transform.dim.y),
+				withMargin(transform.dim.z));
 		}
 		else if (shape == Shape.Sphere) {
 			_shape = new oimo.physics.collision.shape.SphereShape(shapeConfig,
-				withMargin(transform.size.x / 2));
+				withMargin(transform.dim.x / 2));
 		}
 		else {
 			throw "Oimo is restricted to Box and Sphere shapes";
