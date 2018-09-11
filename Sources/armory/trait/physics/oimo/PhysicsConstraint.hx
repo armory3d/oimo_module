@@ -4,9 +4,7 @@ package armory.trait.physics.oimo;
 
 class PhysicsConstraint extends Trait {
 
-	public function new(body1:String, body2:String) {
-		super();
-	}
+	public function new(body1:String, body2:String) { super(); }
 }
 
 #end

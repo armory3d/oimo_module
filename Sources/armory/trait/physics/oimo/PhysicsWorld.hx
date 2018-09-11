@@ -7,7 +7,6 @@ import iron.system.Time;
 import iron.math.Vec4;
 import iron.math.RayCaster;
 import iron.data.SceneFormat;
-import oimo.physics.dynamics.World;
 
 class ContactPair {
 	public var a:Int;
@@ -29,7 +28,7 @@ class PhysicsWorld extends Trait {
 	#end
 
 	public static var active:PhysicsWorld = null;
-	public var world:World;
+	public var world:oimo.dynamics.World;
 	public var rbMap:Map<Int, RigidBody>;
 	var preUpdates:Array<Void->Void> = null;
 	static inline var timeStep = 1 / 60;
@@ -50,24 +49,14 @@ class PhysicsWorld extends Trait {
 		rbMap = new Map();
 		active = this;
 
-		Scene.active.notifyOnInit(function() {
-			notifyOnUpdate(update);
-		});
+		notifyOnLateUpdate(lateUpdate);
 	}
 
 	function createPhysics() {
-		
-		// var gravity = iron.Scene.active.raw.gravity == null ? gravityArray() : iron.Scene.active.raw.gravity;
-		world = new World();
+		var g = iron.Scene.active.raw.gravity;
+		var gravity = g == null ? new oimo.common.Vec3(0, 0, -9.81) : new oimo.common.Vec3(g[0], g[1], g[2]);
+		world = new oimo.dynamics.World(oimo.collision.broadphase.BroadPhaseType._BVH, gravity);
 	}
-
-	// function gravityArray():TFloat32Array {
-	// 	var ar = new TFloat32Array(3);
-	// 	ar[0] = 0.0;
-	// 	ar[1] = 0.0;
-	// 	ar[2] = -9.81;
-	// 	return ar;
-	// }
 
 	public function addRigidBody(body:RigidBody) {
 		world.addRigidBody(body.body);
@@ -89,7 +78,7 @@ class PhysicsWorld extends Trait {
 		return res;
 	}
 
-	public function update() {
+	public function lateUpdate() {
 		#if arm_debug
 		var startTime = kha.Scheduler.realTime();
 		#end

@@ -4,9 +4,7 @@ package armory.trait.physics.oimo;
 
 class PhysicsHook extends Trait {
 
-	public function new(targetName:String, verts:Array<Float>) {
-		super();
-	}
+	public function new(targetName:String, verts:Array<Float>) { super(); }
 }
 
 #end
