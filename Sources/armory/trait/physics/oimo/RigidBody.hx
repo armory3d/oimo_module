@@ -63,9 +63,6 @@ class RigidBody extends Trait {
 	public function init() {
 		if (ready) return;
 		ready = true;
-
-		notifyOnLateUpdate(lateUpdate);
-		notifyOnRemove(removeFromWorld);
 		
 		transform = object.transform;
 		physics = armory.trait.physics.PhysicsWorld.active;
@@ -136,11 +133,12 @@ class RigidBody extends Trait {
 		id = nextId++;
 
 		physics.addRigidBody(this);
+		notifyOnRemove(removeFromWorld);
 
 		if (onReady != null) onReady();
 	}
 
-	function lateUpdate() {
+	function physicsUpdate() {
 		if (!ready) return;
 		if (object.animation != null || animated) {
 			syncTransform();
