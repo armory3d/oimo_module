@@ -33,20 +33,28 @@ class RigidBody extends Trait {
 	static var v2 = new oimo.common.Vec3();
 	static var q1 = new oimo.common.Quat();
 
-	public function new(mass = 1.0, shape = Shape.Box, friction = 0.5, restitution = 0.0, collisionMargin = 0.0,
-						linearDamping = 0.04, angularDamping = 0.1, animated = false,
-						linearFactors:Array<Float> = null, angularFactors:Array<Float> = null,
-						group = 1, trigger = false, deactivationParams:Array<Float> = null) {
+	public function new(shape = Shape.Box, mass = 1.0, friction = 0.5, restitution = 0.0, group = 1,
+						params:Array<Float> = null, flags:Array<Bool> = null) {
 		super();
 
-		this.mass = mass;
 		this.shape = shape;
+		this.mass = mass;
 		this.friction = friction;
 		this.restitution = restitution;
-		this.collisionMargin = collisionMargin;
-		this.linearDamping = linearDamping;
-		this.angularDamping = angularDamping;
-		this.animated = animated;
+		// this.group = group;
+
+		if (params == null) params = [0.04, 0.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0];
+		if (flags == null) flags = [false, false, false];
+
+		this.linearDamping = params[0];
+		this.angularDamping = params[1];
+		// this.linearFactors = [params[2], params[3], params[4]];
+		// this.angularFactors = [params[5], params[6], params[7]];
+		// this.collisionMargin = params[8];
+		// this.deactivationParams = [params[9], params[10], params[11]];
+		this.animated = flags[0];
+		// this.trigger = flags[1];
+		// this.ccd = flags[2];
 
 		notifyOnAdd(init);
 	}
