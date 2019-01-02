@@ -137,6 +137,8 @@ class RigidBody extends Trait {
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
 		body.addShape(new oimo.dynamics.rigidbody.Shape(shapeConfig));
+		body.setLinearDamping(this.linearDamping);
+		body.setAngularDamping(this.angularDamping);
 		body.userData = this;
 
 		id = nextId++;
