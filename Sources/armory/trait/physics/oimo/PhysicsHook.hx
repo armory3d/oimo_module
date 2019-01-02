@@ -1,6 +1,7 @@
 package armory.trait.physics.oimo;
 
 #if arm_oimo
+import iron.Trait;
 
 class PhysicsHook extends Trait {
 
