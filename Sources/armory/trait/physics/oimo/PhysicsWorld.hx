@@ -34,7 +34,8 @@ class PhysicsWorld extends Trait {
 	static inline var timeStep = 1 / 60;
 	static inline var fixedStep = 1 / 60;
 	public var hitPointWorld = new Vec4();
-
+	public var pause = false;
+	
 	public function new() {
 		super();
 
@@ -87,9 +88,10 @@ class PhysicsWorld extends Trait {
 
 		if (preUpdates != null) for (f in preUpdates) f();
 
-		world.step(timeStep);
-
-		for (rb in rbMap) @:privateAccess rb.physicsUpdate();
+		if (!pause) {
+			world.step(timeStep);
+			for (rb in rbMap) @:privateAccess rb.physicsUpdate();
+		}
 
 		#if arm_debug
 		physTime = kha.Scheduler.realTime() - startTime;
