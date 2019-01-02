@@ -184,8 +184,8 @@ class RigidBody extends Trait {
 	public function applyImpulse(impulse:Vec4, loc:Vec4 = null) {
 		activate();
 		if (loc == null) loc = transform.loc;
-		v1.init(loc.x, loc.y, loc.z);
-		v2.init(impulse.x, impulse.y, impulse.z);
+		v1.init(impulse.x, impulse.y, impulse.z);
+		v2.init(loc.x, loc.y, loc.z);
 		body.applyImpulse(v1, v2);
 	}
 
