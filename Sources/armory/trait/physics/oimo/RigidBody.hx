@@ -137,6 +137,9 @@ class RigidBody extends Trait {
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
 		body.addShape(new oimo.dynamics.rigidbody.Shape(shapeConfig));
+		body.setLinearDamping(this.linearDamping);
+		body.setAngularDamping(this.angularDamping);
+		body.userData = this;
 
 		id = nextId++;
 
@@ -183,8 +186,8 @@ class RigidBody extends Trait {
 	public function applyImpulse(impulse:Vec4, loc:Vec4 = null) {
 		activate();
 		if (loc == null) loc = transform.loc;
-		v1.init(loc.x, loc.y, loc.z);
-		v2.init(impulse.x, impulse.y, impulse.z);
+		v1.init(impulse.x, impulse.y, impulse.z);
+		v2.init(loc.x, loc.y, loc.z);
 		body.applyImpulse(v1, v2);
 	}
 

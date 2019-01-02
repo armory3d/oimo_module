@@ -34,7 +34,9 @@ class PhysicsWorld extends Trait {
 	static inline var timeStep = 1 / 60;
 	static inline var fixedStep = 1 / 60;
 	public var hitPointWorld = new Vec4();
-
+	public var rayCastResult:oimo.dynamics.callback.RayCastClosest;
+	public var pause = false;
+	
 	public function new() {
 		super();
 
@@ -48,6 +50,7 @@ class PhysicsWorld extends Trait {
 
 		rbMap = new Map();
 		active = this;
+		rayCastResult = new oimo.dynamics.callback.RayCastClosest();
 
 		// Ensure physics are updated first in the lateUpdate list
 		_lateUpdate = [lateUpdate];
@@ -87,9 +90,10 @@ class PhysicsWorld extends Trait {
 
 		if (preUpdates != null) for (f in preUpdates) f();
 
-		world.step(timeStep);
-
-		for (rb in rbMap) @:privateAccess rb.physicsUpdate();
+		if (!pause) {
+			world.step(timeStep);
+			for (rb in rbMap) @:privateAccess rb.physicsUpdate();
+		}
 
 		#if arm_debug
 		physTime = kha.Scheduler.realTime() - startTime;
@@ -101,7 +105,13 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function rayCast(from:Vec4, to:Vec4):RigidBody {
-		return null;
+		rayCastResult.clear();
+		world.rayCast(new oimo.common.Vec3(from.x, from.y, from.z), new oimo.common.Vec3(to.x, to.y, to.z), rayCastResult);
+		if (rayCastResult.shape!= null) {
+			return cast (rayCastResult.shape._rigidBody.userData, RigidBody);
+		} else {
+			return null;
+		}
 	}
 
 	public function notifyOnPreUpdate(f:Void->Void) {
