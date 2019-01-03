@@ -35,6 +35,7 @@ class PhysicsWorld extends Trait {
 	static inline var fixedStep = 1 / 60;
 	public var hitPointWorld = new Vec4();
 	public var rayCastResult:oimo.dynamics.callback.RayCastClosest;
+	var contacts:Array<ContactPair>;
 	public var pause = false;
 	
 	public function new() {
@@ -51,6 +52,7 @@ class PhysicsWorld extends Trait {
 		rbMap = new Map();
 		active = this;
 		rayCastResult = new oimo.dynamics.callback.RayCastClosest();
+		contacts = [];
 
 		// Ensure physics are updated first in the lateUpdate list
 		_lateUpdate = [lateUpdate];
@@ -74,12 +76,22 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function getContacts(body:RigidBody):Array<RigidBody> {
+		if (contacts.length == 0) return null;
 		var res:Array<RigidBody> = [];
+		for (c in contacts) {
+			if (c.a == body.id) res.push(rbMap.get(c.b));
+			else if (c.b == body.id) res.push(rbMap.get(c.a));
+		}
 		return res;
 	}
 
 	public function getContactPairs(body:RigidBody):Array<ContactPair> {
+		if (contacts.length == 0) return null;
 		var res:Array<ContactPair> = [];
+		for (c in contacts) {
+			if (c.a == body.id) res.push(c);
+			else if (c.b == body.id) res.push(c);
+		}
 		return res;
 	}
 
@@ -92,6 +104,7 @@ class PhysicsWorld extends Trait {
 
 		if (!pause) {
 			world.step(timeStep);
+			updateContacts();
 			for (rb in rbMap) @:privateAccess rb.physicsUpdate();
 		}
 
@@ -99,6 +112,32 @@ class PhysicsWorld extends Trait {
 		physTime = kha.Scheduler.realTime() - startTime;
 		#end
 	}
+
+	function updateContacts() {
+		contacts = [];
+
+		var contact_list = world.getContactManager().getContactList();
+		while(contact_list != null) {
+			var b1 = cast (contact_list._b1.userData, RigidBody);
+			var b2 = cast (contact_list._b2.userData, RigidBody);
+			var cp = new ContactPair(b1.id, b2.id);
+			for (pt in contact_list.getManifold().getPoints()) {
+				if (pt.getDepth() > 0) {
+					var posA = pt.getPosition1();
+					var posB = pt.getPosition2();
+					var nor  = contact_list.getManifold().getNormal();
+					cp.posA = new Vec4(posA.x, posA.y, posA.z);
+					cp.posB = new Vec4(posB.x, posB.y, posB.z);
+					cp.nor  = new Vec4(nor.x,  nor.y,  nor.z );
+					cp.impulse = pt.getNormalImpulse();
+					contacts.push(cp);
+					break;
+				}
+			}
+			contact_list = contact_list.getNext();
+		}
+
+	} 
 
 	public function pickClosest(inputX:Float, inputY:Float):RigidBody {
 		return null;
