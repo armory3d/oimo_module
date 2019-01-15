@@ -92,16 +92,17 @@ class RigidBody extends Trait {
 			);
 		}
 		else if (shape == Shape.ConvexHull || shape == Shape.Mesh) {
-			var positions = cast(object, MeshObject).data.geom.positions;
-			var sx = transform.scale.x * (1.0 - collisionMargin);
-			var sy = transform.scale.y * (1.0 - collisionMargin);
-			var sz = transform.scale.z * (1.0 - collisionMargin);
+			var md = cast(object, MeshObject).data;
+			var positions = md.geom.positions;
+			var sx = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sy = transform.scale.y * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sz = transform.scale.z * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
 			var verts:Array<oimo.common.Vec3> = [];
-			for (i in 0...Std.int(positions.length / 3)) {
+			for (i in 0...Std.int(positions.length / 4)) {
 				verts.push(new oimo.common.Vec3(
-					positions[i * 3] * sx,
-					positions[i * 3 + 1] * sy,
-					positions[i * 3 + 2] * sz
+					positions[i * 4    ] * sx,
+					positions[i * 4 + 1] * sy,
+					positions[i * 4 + 2] * sz
 				));
 			}
 			shapeConfig.geometry = new oimo.collision.geometry.ConvexHullGeometry(

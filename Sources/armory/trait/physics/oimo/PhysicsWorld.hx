@@ -136,7 +136,6 @@ class PhysicsWorld extends Trait {
 			}
 			contact_list = contact_list.getNext();
 		}
-
 	} 
 
 	public function pickClosest(inputX:Float, inputY:Float):RigidBody {
@@ -148,7 +147,8 @@ class PhysicsWorld extends Trait {
 		world.rayCast(new oimo.common.Vec3(from.x, from.y, from.z), new oimo.common.Vec3(to.x, to.y, to.z), rayCastResult);
 		if (rayCastResult.shape!= null) {
 			return cast (rayCastResult.shape._rigidBody.userData, RigidBody);
-		} else {
+		}
+		else {
 			return null;
 		}
 	}
