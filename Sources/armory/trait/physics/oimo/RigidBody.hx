@@ -33,8 +33,8 @@ class RigidBody extends Trait {
 	static var v2 = new oimo.common.Vec3();
 	static var q1 = new oimo.common.Quat();
 
-	public function new(shape = Shape.Box, mass = 1.0, friction = 0.5, restitution = 0.0, group = 1,
-						params:Array<Float> = null, flags:Array<Bool> = null) {
+	public function new(shape = Shape.Box, mass = 1.0, friction = 0.5, restitution = 0.0, group = 1, mask = 1,
+						params: Array<Float> = null, flags: Array<Bool> = null) {
 		super();
 
 		this.shape = shape;
