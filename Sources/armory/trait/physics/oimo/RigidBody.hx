@@ -58,7 +58,7 @@ class RigidBody extends Trait {
 
 		notifyOnAdd(init);
 	}
-	
+
 	inline function withMargin(f:Float) {
 		return f - f * collisionMargin;
 	}
@@ -71,10 +71,10 @@ class RigidBody extends Trait {
 	public function init() {
 		if (ready) return;
 		ready = true;
-		
+
 		transform = object.transform;
 		physics = armory.trait.physics.PhysicsWorld.active;
-		
+
 		var shapeConfig = new oimo.dynamics.rigidbody.ShapeConfig();
 		shapeConfig.friction = friction;
 		shapeConfig.restitution = restitution;
@@ -93,7 +93,7 @@ class RigidBody extends Trait {
 		}
 		else if (shape == Shape.ConvexHull || shape == Shape.Mesh) {
 			var md = cast(object, MeshObject).data;
-			var positions = md.geom.positions;
+			var positions = md.geom.positions.values;
 			var sx = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
 			var sy = transform.scale.y * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
 			var sz = transform.scale.z * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
