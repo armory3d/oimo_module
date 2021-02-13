@@ -6,7 +6,6 @@ import iron.Trait;
 import iron.system.Time;
 import iron.math.Vec4;
 import iron.math.RayCaster;
-import iron.data.SceneFormat;
 
 class ContactPair {
 	public var a:Int;
@@ -114,7 +113,7 @@ class PhysicsWorld extends Trait {
 	}
 
 	function updateContacts() {
-		contacts = [];
+		contacts.resize(0);
 
 		var contact_list = world.getContactManager().getContactList();
 		while(contact_list != null) {
