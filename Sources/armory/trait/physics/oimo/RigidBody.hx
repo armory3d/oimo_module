@@ -192,12 +192,25 @@ class RigidBody extends Trait {
 		body.applyImpulse(v1, v2);
 	}
 
+	public function applyForce(force:Vec4, loc:Vec4 = null) {
+		activate();
+		if (loc == null) loc = transform.loc;
+		v1.init(force.x, force.y, force.z);
+		v2.init(loc.x, loc.y, loc.z);
+		body.applyForce(v1, v2);
+	}
+
 	public function setLinearFactor(x:Float, y:Float, z:Float) {
 	}
 
 	public function setAngularFactor(x:Float, y:Float, z:Float) {
 		v1.init(x, y, z);
 		body.setRotationFactor(v1);
+	}
+
+	public function getPosition() {
+		var v = body.getPosition();
+		return new Vec4(v.x, v.y, v.z);
 	}
 
 	public function getLinearVelocity():Vec4 {
