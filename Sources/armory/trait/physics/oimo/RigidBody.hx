@@ -10,16 +10,35 @@ import iron.object.MeshObject;
 class RigidBody extends Trait {
 
 	var shape:Shape;
+
 	public var physics:PhysicsWorld;
 	public var transform:Transform = null;
 
+	// Params
 	public var mass:Float;
 	public var friction:Float;
 	public var restitution:Float;
 	public var collisionMargin:Float;
 	public var linearDamping:Float;
 	public var angularDamping:Float;
+
+	public var group:Int;
+	public var mask:Int;
+
+	// public var linearFactor:oimo.common.Vec3;
+	public var angularFactor:oimo.common.Vec3;
+	// public var angularFriction:Float;
+
+	// public var linearDeactivationThreshold:Float;
+	// public var angularDeactivationThreshold:Float;
+	// public var deactivationTime:Float;
+
+	// Flags
 	public var animated:Bool;
+	public var trigger:Bool;
+	public var ccd:Bool;
+	public var staticObj:Bool;
+	public var useDeactivation:Bool;
 
 	public var body:oimo.dynamics.rigidbody.RigidBody = null;
 	public var ready = false;
@@ -33,28 +52,34 @@ class RigidBody extends Trait {
 	static var v2 = new oimo.common.Vec3();
 	static var q1 = new oimo.common.Quat();
 
-	public function new(shape = Shape.Box, mass = 1.0, friction = 0.5, restitution = 0.0, group = 1, mask = 1,
-						params: Array<Float> = null, flags: Array<Bool> = null) {
+	public function new(shape = Shape.Box, mass = 1.0, friction = 0.5, restitution = 0.0, group = 1, mask = 1, params = null, flags = null) {
 		super();
-
+		
 		this.shape = shape;
 		this.mass = mass;
 		this.friction = friction;
 		this.restitution = restitution;
-		// this.group = group;
 
-		if (params == null) params = [0.04, 0.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0];
-		if (flags == null) flags = [false, false, false];
+		this.group = group;
+		this.mask = mask;
 
-		this.linearDamping = params[0];
-		this.angularDamping = params[1];
-		// this.linearFactors = [params[2], params[3], params[4]];
-		// this.angularFactors = [params[5], params[6], params[7]];
-		// this.collisionMargin = params[8];
-		// this.deactivationParams = [params[9], params[10], params[11]];
-		this.animated = flags[0];
-		// this.trigger = flags[1];
-		// this.ccd = flags[2];
+		this.collisionMargin = params.collisionMargin;
+		this.linearDamping = params.linearDamping;
+		this.angularDamping = params.angularDamping;
+
+		// this.linearFactor = new oimo.common.Vec3(params.linearFactorsX, params.linearFactorsy, params.linearFactorsZ);
+		this.angularFactor = new oimo.common.Vec3(params.angularFactorsX, params.angularFactorsy, params.angularFactorsZ);
+		// this.angularFriction = params.angularFriction;
+
+		// this.linearDeactivationThreshold = params.linearDeactivationThreshold;
+		// this.angularDeactivationThreshold = params.angularDeactivationThreshold;
+		// this.deactivationTime = params.deactivationTime;
+
+		this.animated = flags.animated;
+		this.trigger = flags.trigger;
+		this.ccd = flags.ccd;
+		this.staticObj = flags.staticObj;
+		this.useDeactivation = flags.useDeactivation;
 
 		notifyOnAdd(init);
 	}
@@ -132,14 +157,16 @@ class RigidBody extends Trait {
 		}
 
 		var bodyConfig = new oimo.dynamics.rigidbody.RigidBodyConfig();
-		bodyConfig.type = mass > 0 ? oimo.dynamics.rigidbody.RigidBodyType.DYNAMIC : oimo.dynamics.rigidbody.RigidBodyType.STATIC;
+		bodyConfig.type = animated ? oimo.dynamics.rigidbody.RigidBodyType.KINEMATIC : !staticObj ? oimo.dynamics.rigidbody.RigidBodyType.DYNAMIC : oimo.dynamics.rigidbody.RigidBodyType.STATIC;
 		bodyConfig.position.init(transform.worldx(), transform.worldy(), transform.worldz());
+		bodyConfig.linearDamping = linearDamping;
+		bodyConfig.angularDamping = angularDamping;
+		bodyConfig.autoSleep = useDeactivation;
 		body = new oimo.dynamics.rigidbody.RigidBody(bodyConfig);
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
+		body.setRotationFactor(angularFactor);
 		body.addShape(new oimo.dynamics.rigidbody.Shape(shapeConfig));
-		body.setLinearDamping(0.04);
-		body.setAngularDamping(0.1);
 		body.userData = this;
 
 		id = nextId++;
@@ -248,11 +275,11 @@ class RigidBody extends Trait {
 @:enum abstract Shape(Int) from Int to Int {
 	var Box = 0;
 	var Sphere = 1;
-	var ConvexHull = 2;
-	var Mesh = 3;
+	var Capsule = 2;
+	var Cylinder = 3;
 	var Cone = 4;
-	var Cylinder = 5;
-	var Capsule = 6;
+	var ConvexHull = 5;
+	var Mesh = 6;
 	var Terrain = 7;
 }
 
