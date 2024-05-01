@@ -7,6 +7,11 @@ import iron.system.Time;
 import iron.math.Vec4;
 import iron.math.RayCaster;
 
+import oimo.collision.geometry.RayCastHit;
+import oimo.common.Vec3;
+import oimo.dynamics.callback.RayCastClosest;
+import oimo.dynamics.rigidbody.Shape;
+
 class Hit {
 	public var rb: RigidBody;
 	public var pos: Vec4;
@@ -19,34 +24,33 @@ class Hit {
 }
 
 class ContactPair {
-	public var a:Int;
-	public var b:Int;
-	public var posA:Vec4;
-	public var posB:Vec4;
-	public var nor:Vec4;
-	public var impulse:Float;
-	public function new(a:Int, b:Int) {
+	public var a: Int;
+	public var b: Int;
+	public var posA: Vec4;
+	public var posB: Vec4;
+	public var nor: Vec4;
+	public var impulse: Float;
+	public function new(a: Int, b: Int) {
 		this.a = a;
 		this.b = b;
 	}
 }
 
 class PhysicsWorld extends Trait {
-
 	#if arm_debug
 	public static var physTime = 0.0;
 	#end
 
-	public static var active:PhysicsWorld = null;
-	public var world:oimo.dynamics.World;
-	public var rbMap:Map<Int, RigidBody>;
-	var preUpdates:Array<Void->Void> = null;
-	static inline var timeStep = 1 / 60;
-	static inline var fixedStep = 1 / 60;
+	public static var active: PhysicsWorld = null;
+	public var world: oimo.dynamics.World;
+	public var rbMap: Map<Int, RigidBody>;
+	var preUpdates: Array<Void->Void> = null;
+	static inline var timeStep: Float = 1 / 60;
+	static inline var fixedStep: Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
-	public var rayCastResult:oimo.dynamics.callback.RayCastClosest;
-	var contacts:Array<ContactPair>;
-	public var pause = false;
+	public var rayCastResult: RayCastMask;
+	var contacts: Array<ContactPair>;
+	public var pause: Bool = false;
 	
 	public function new() {
 		super();
@@ -61,7 +65,7 @@ class PhysicsWorld extends Trait {
 
 		rbMap = new Map();
 		active = this;
-		rayCastResult = new oimo.dynamics.callback.RayCastClosest();
+		rayCastResult = new RayCastMask();
 		contacts = [];
 
 		// Ensure physics are updated first in the lateUpdate list
@@ -71,12 +75,12 @@ class PhysicsWorld extends Trait {
 
 	function createPhysics() {
 		var g = iron.Scene.active.raw.gravity;
-		var gravity = g == null ? new oimo.common.Vec3(0, 0, -9.81) : new oimo.common.Vec3(g[0], g[1], g[2]);
+		var gravity = g == null ? new Vec3(0, 0, -9.81) : new Vec3(g[0], g[1], g[2]);
 		world = new oimo.dynamics.World(oimo.collision.broadphase.BroadPhaseType._BVH, gravity);
 	}
 
 	public function setGravity(v: Vec4) {
-		world.setGravity(new oimo.common.Vec3(v.x, v.y, v.z));
+		world.setGravity(new Vec3(v.x, v.y, v.z));
 	}
 
 	function getGravity(): Vec4 {
@@ -84,19 +88,19 @@ class PhysicsWorld extends Trait {
 		return new Vec4(g.x, g.y, g.z);
 	}
 
-	public function addRigidBody(body:RigidBody) {
+	public function addRigidBody(body: RigidBody) {
 		world.addRigidBody(body.body);
 		rbMap.set(body.id, body);
 	}
 
-	public function removeRigidBody(body:RigidBody) {
+	public function removeRigidBody(body: RigidBody) {
 		if (world != null) world.removeRigidBody(body.body);
 		rbMap.remove(body.id);
 	}
 
-	public function getContacts(body:RigidBody):Array<RigidBody> {
+	public function getContacts(body: RigidBody): Array<RigidBody> {
 		if (contacts.length == 0) return null;
-		var res:Array<RigidBody> = [];
+		var res: Array<RigidBody> = [];
 		for (c in contacts) {
 			if (c.a == body.id) res.push(rbMap.get(c.b));
 			else if (c.b == body.id) res.push(rbMap.get(c.a));
@@ -104,9 +108,9 @@ class PhysicsWorld extends Trait {
 		return res;
 	}
 
-	public function getContactPairs(body:RigidBody):Array<ContactPair> {
+	public function getContactPairs(body: RigidBody): Array<ContactPair> {
 		if (contacts.length == 0) return null;
-		var res:Array<ContactPair> = [];
+		var res: Array<ContactPair> = [];
 		for (c in contacts) {
 			if (c.a == body.id) res.push(c);
 			else if (c.b == body.id) res.push(c);
@@ -160,32 +164,57 @@ class PhysicsWorld extends Trait {
 		}
 	} 
 
-	public function pickClosest(inputX:Float, inputY:Float):RigidBody {
+	public function pickClosest(inputX: Float, inputY: Float): RigidBody {
 		return null;
 	}
 
-	public function rayCast(from:Vec4, to:Vec4, group:Int = 0x00000001, mask:Int = 0xFFFFFFFF):Hit {
-		// TO DO: implement groups and masks
+	public function rayCast(from: Vec4, to: Vec4, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): Hit {
 		rayCastResult.clear();
-		world.rayCast(new oimo.common.Vec3(from.x, from.y, from.z), new oimo.common.Vec3(to.x, to.y, to.z), rayCastResult);
+		rayCastResult.group = group;
+		rayCastResult.mask = mask;
+
+		world.rayCast(new Vec3(from.x, from.y, from.z), new Vec3(to.x, to.y, to.z), rayCastResult);
+		
 		if (rayCastResult.hit) {
-			var rb = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
-			var pos = rayCastResult.position;
-			var normal = rayCastResult.normal;
+			var rb: RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
+			var pos: Vec3 = rayCastResult.position;
+			var normal: Vec3 = rayCastResult.normal;
 			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
 		}
-		else {
-			return null;
-		}
+		
+		return null;
 	}
 
-	public function notifyOnPreUpdate(f:Void->Void) {
+	public function notifyOnPreUpdate(f: Void -> Void) {
 		if (preUpdates == null) preUpdates = [];
 		preUpdates.push(f);
 	}
 
-	public function removePreUpdate(f:Void->Void) {
+	public function removePreUpdate(f: Void -> Void) {
 		preUpdates.remove(f);
+	}
+}
+
+private class RayCastMask extends RayCastClosest {
+    public var group: Int;
+    public var mask: Int;
+
+    public function new(group: Int = 0x00000001, mask: Int = 0xFFFFFFFF) {
+        super();
+        this.group = group;
+        this.mask = mask;
+	}
+
+	override public function process(shape: Shape, hit: RayCastHit):Void {
+		if (hit.fraction < fraction) {
+            if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) {
+                this.shape = shape;
+                this.hit = true;
+                fraction = hit.fraction;
+                position.copyFrom(hit.position);
+                normal.copyFrom(hit.normal);
+            }
+		}
 	}
 }
 

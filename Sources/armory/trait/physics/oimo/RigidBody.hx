@@ -253,6 +253,15 @@ class RigidBody extends Trait {
 		body.applyTorque(v1);
 	}
 
+	public function getAngularDamping(): Float {
+		return body.getAngularDamping();
+	}
+
+	public function setAngularDamping(d: Float) {
+		angularDamping = d;
+		body.setAngularDamping(angularDamping);
+	}
+
 	public function setLinearFactor(x: Float, y: Float, z: Float) {
 	}
 
