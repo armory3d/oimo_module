@@ -206,15 +206,7 @@ private class RayCastMask extends RayCastClosest {
 	}
 
 	override public function process(shape: Shape, hit: RayCastHit):Void {
-		if (hit.fraction < fraction) {
-            if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) {
-                this.shape = shape;
-                this.hit = true;
-                fraction = hit.fraction;
-                position.copyFrom(hit.position);
-                normal.copyFrom(hit.normal);
-            }
-		}
+		if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) super.process(shape, hit);
 	}
 }
 
