@@ -2,30 +2,43 @@ package armory.trait.physics.oimo;
 
 #if arm_oimo
 
+import armory.trait.physics.PhysicsWorld;
+
 import iron.Trait;
+import iron.data.MeshData;
 import iron.math.Vec4;
 import iron.object.Transform;
 import iron.object.MeshObject;
 
-class RigidBody extends Trait {
-	var shape:Shape;
+import oimo.collision.geometry.*;
+import oimo.common.Mat3;
+import oimo.common.Quat;
+import oimo.common.Vec3;
+// import oimo.dynamics.rigidbody.MassData;
+import oimo.dynamics.rigidbody.RigidBodyConfig;
+import oimo.dynamics.rigidbody.RigidBodyType;
+import oimo.dynamics.rigidbody.Shape;
+import oimo.dynamics.rigidbody.ShapeConfig;
 
-	public var physics:PhysicsWorld;
-	public var transform:Transform = null;
+class RigidBody extends Trait {
+	var shape: Shapes;
+
+	public var physics: PhysicsWorld;
+	public var transform: Transform = null;
 
 	// Params
-	public var mass:Float;
-	public var friction:Float;
-	public var restitution:Float;
-	public var collisionMargin:Float;
-	public var linearDamping:Float;
-	public var angularDamping:Float;
+	public var mass: Float;
+	public var friction: Float;
+	public var restitution: Float;
+	public var collisionMargin: Float;
+	public var linearDamping: Float;
+	public var angularDamping: Float;
 
-	public var group:Int;
-	public var mask:Int;
+	public var group: Int;
+	public var mask: Int;
 
-	// public var linearFactor:oimo.common.Vec3;
-	public var angularFactor:oimo.common.Vec3;
+	public var linearFactor: Vec3;
+	public var angularFactor: Vec3;
 	// public var angularFriction:Float;
 
 	// public var linearDeactivationThreshold:Float;
@@ -33,25 +46,25 @@ class RigidBody extends Trait {
 	// public var deactivationTime:Float;
 
 	// Flags
-	public var animated:Bool;
-	public var trigger:Bool;
-	public var ccd:Bool;
-	public var staticObj:Bool;
-	public var useDeactivation:Bool;
+	public var animated: Bool;
+	public var trigger: Bool;
+	public var ccd: Bool;
+	public var staticObj: Bool;
+	public var useDeactivation: Bool;
 
-	public var body:oimo.dynamics.rigidbody.RigidBody = null;
-	public var ready = false;
+	public var body: oimo.dynamics.rigidbody.RigidBody = null;
+	public var ready: Bool = false;
 
-	static var nextId = 0;
-	public var id = 0;
+	static var nextId: Int = 0;
+	public var id: Int = 0;
 
-	public var onReady:Void->Void = null;
+	public var onReady: Void -> Void = null;
 
-	static var v1 = new oimo.common.Vec3();
-	static var v2 = new oimo.common.Vec3();
-	static var q1 = new oimo.common.Quat();
+	static var v1: Vec3 = new Vec3();
+	static var v2: Vec3 = new Vec3();
+	static var q1: Quat = new Quat();
 
-	public function new(shape = Shape.Box, mass = 1.0, friction = 0.5, restitution = 0.0, group = 1, mask = 1, params = null, flags = null) {
+	public function new(shape: Shapes = Shapes.Box, mass: Float = 1.0, friction: Float = 0.5, restitution: Float = 0.0, group: Int = 1, mask: Int = 1, params = null, flags = null) {
 		super();
 		
 		this.shape = shape;
@@ -62,12 +75,13 @@ class RigidBody extends Trait {
 		this.group = group;
 		this.mask = mask;
 
+		// 'params' and 'flags' are anonymous structures
 		this.collisionMargin = params.collisionMargin;
 		this.linearDamping = params.linearDamping;
 		this.angularDamping = params.angularDamping;
 
-		// this.linearFactor = new oimo.common.Vec3(params.linearFactorsX, params.linearFactorsy, params.linearFactorsZ);
-		this.angularFactor = new oimo.common.Vec3(params.angularFactorsX, params.angularFactorsy, params.angularFactorsZ);
+		this.linearFactor = new Vec3(params.linearFactorsX, params.linearFactorsY, params.linearFactorsZ);
+		this.angularFactor = new Vec3(params.angularFactorsX, params.angularFactorsY, params.angularFactorsZ);
 		// this.angularFriction = params.angularFriction;
 
 		// this.linearDeactivationThreshold = params.linearDeactivationThreshold;
@@ -97,66 +111,68 @@ class RigidBody extends Trait {
 		ready = true;
 
 		transform = object.transform;
-		physics = armory.trait.physics.PhysicsWorld.active;
+		physics = PhysicsWorld.active;
 
-		var shapeConfig = new oimo.dynamics.rigidbody.ShapeConfig();
+		var shapeConfig: ShapeConfig = new ShapeConfig();
 		shapeConfig.friction = friction;
 		shapeConfig.restitution = restitution;
 		shapeConfig.density = mass > 0 ? mass : 1.0;
+		shapeConfig.collisionGroup = group;
+		shapeConfig.collisionMask = mask;
 
-		if (shape == Shape.Box) {
+		if (shape == Shapes.Box) {
 			v1.init(withMargin(transform.dim.x) / 2, withMargin(transform.dim.y) / 2, withMargin(transform.dim.z) / 2);
-			shapeConfig.geometry = new oimo.collision.geometry.BoxGeometry(
+			shapeConfig.geometry = new BoxGeometry(
 				v1
 			);
 		}
-		else if (shape == Shape.Sphere) {
-			shapeConfig.geometry = new oimo.collision.geometry.SphereGeometry(
+		else if (shape == Shapes.Sphere) {
+			shapeConfig.geometry = new SphereGeometry(
 				withMargin(transform.dim.x) / 2
 			);
 		}
-		else if (shape == Shape.ConvexHull || shape == Shape.Mesh) {
-			var md = cast(object, MeshObject).data;
-			var positions = md.geom.positions.values;
-			var sx = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
-			var sy = transform.scale.y * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
-			var sz = transform.scale.z * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
-			var verts:Array<oimo.common.Vec3> = [];
+		else if (shape == Shapes.ConvexHull || shape == Shapes.Mesh) {
+			var md: MeshData = cast(object, MeshObject).data;
+			var positions: kha.arrays.Int16Array = md.geom.positions.values;
+			var sx: Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sy: Float = transform.scale.y * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sz: Float = transform.scale.z * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var verts: Array<Vec3> = [];
 			for (i in 0...Std.int(positions.length / 4)) {
-				verts.push(new oimo.common.Vec3(
+				verts.push(new Vec3(
 					positions[i * 4    ] * sx,
 					positions[i * 4 + 1] * sy,
 					positions[i * 4 + 2] * sz
 				));
 			}
-			shapeConfig.geometry = new oimo.collision.geometry.ConvexHullGeometry(
+			shapeConfig.geometry = new ConvexHullGeometry(
 				verts
 			);
 		}
-		else if (shape == Shape.Cone) {
+		else if (shape == Shapes.Cone) {
 			// TODO: fix axis
-			shapeConfig.geometry = new oimo.collision.geometry.ConeGeometry(
+			shapeConfig.geometry = new ConeGeometry(
 				withMargin(transform.dim.x) / 2, // Radius
 				withMargin(transform.dim.y) / 2 // Half-height
 			);
 		}
-		else if (shape == Shape.Cylinder) {
+		else if (shape == Shapes.Cylinder) {
 			// TODO: fix axis
-			shapeConfig.geometry = new oimo.collision.geometry.CylinderGeometry(
+			shapeConfig.geometry = new CylinderGeometry(
 				withMargin(transform.dim.x) / 2, // Radius
 				withMargin(transform.dim.y) / 2 // Half-height
 			);
 		}
-		else if (shape == Shape.Capsule) {
+		else if (shape == Shapes.Capsule) {
 			// TODO: fix axis
-			shapeConfig.geometry = new oimo.collision.geometry.CapsuleGeometry(
+			shapeConfig.geometry = new CapsuleGeometry(
 				withMargin(transform.dim.x) / 2, // Radius
 				withMargin(transform.dim.y) / 2 // Half-height
 			);
 		}
 
-		var bodyConfig = new oimo.dynamics.rigidbody.RigidBodyConfig();
-		bodyConfig.type = animated ? oimo.dynamics.rigidbody.RigidBodyType.KINEMATIC : !staticObj ? oimo.dynamics.rigidbody.RigidBodyType.DYNAMIC : oimo.dynamics.rigidbody.RigidBodyType.STATIC;
+		var bodyConfig: RigidBodyConfig = new RigidBodyConfig();
+		bodyConfig.type = animated ? RigidBodyType.KINEMATIC : !staticObj ? RigidBodyType.DYNAMIC : RigidBodyType.STATIC;
 		bodyConfig.position.init(transform.worldx(), transform.worldy(), transform.worldz());
 		bodyConfig.linearDamping = linearDamping;
 		bodyConfig.angularDamping = angularDamping;
@@ -164,8 +180,13 @@ class RigidBody extends Trait {
 		body = new oimo.dynamics.rigidbody.RigidBody(bodyConfig);
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
+		// TODO: implement inertia from this.linearFactor
+		// var massData: MassData = new MassData();
+		// massData.mass = mass;
+		// massData.localInertia = new Mat3();
+		// body.setMassData(massData);
 		body.setRotationFactor(angularFactor);
-		body.addShape(new oimo.dynamics.rigidbody.Shape(shapeConfig));
+		body.addShape(new Shape(shapeConfig));
 		body.userData = this;
 
 		id = nextId++;
@@ -182,8 +203,8 @@ class RigidBody extends Trait {
 			syncTransform();
 		}
 		else {
-			var p = body.getPosition();
-			var q = body.getOrientation();
+			var p: Vec3 = body.getPosition();
+			var q: Quat = body.getOrientation();
 			transform.loc.set(p.x, p.y, p.z);
 			transform.rot.set(q.x, q.y, q.z, q.w);
 			if (object.parent != null) {
@@ -207,10 +228,10 @@ class RigidBody extends Trait {
 	public function disableGravity() {
 	}
 
-	public function setActivationState(newState:Int) {
+	public function setActivationState(newState: Int) {
 	}
 
-	public function applyForce(force:Vec4, loc:Vec4 = null) {
+	public function applyForce(force: Vec4, loc: Vec4 = null) {
 		activate();
 		if (loc == null) loc = transform.loc;
 		v1.init(force.x, force.y, force.z);
@@ -218,7 +239,7 @@ class RigidBody extends Trait {
 		body.applyForce(v1, v2);
 	}
 
-	public function applyImpulse(impulse:Vec4, loc:Vec4 = null) {
+	public function applyImpulse(impulse: Vec4, loc: Vec4 = null) {
 		activate();
 		if (loc == null) loc = transform.loc;
 		v1.init(impulse.x, impulse.y, impulse.z);
@@ -226,46 +247,46 @@ class RigidBody extends Trait {
 		body.applyImpulse(v1, v2);
 	}
 
-	public function applyTorque(torque:Vec4) {
+	public function applyTorque(torque: Vec4) {
 		activate();
 		v1.init(torque.x, torque.y, torque.z);
 		body.applyTorque(v1);
 	}
 
-	public function setLinearFactor(x:Float, y:Float, z:Float) {
+	public function setLinearFactor(x: Float, y: Float, z: Float) {
 	}
 
-	public function setAngularFactor(x:Float, y:Float, z:Float) {
+	public function setAngularFactor(x: Float, y: Float, z: Float) {
 		v1.init(x, y, z);
 		body.setRotationFactor(v1);
 	}
 
 	public function getPosition() {
-		var v = body.getPosition();
+		var v: Vec3 = body.getPosition();
 		return new Vec4(v.x, v.y, v.z);
 	}
 
-	public function getLinearVelocity():Vec4 {
+	public function getLinearVelocity(): Vec4 {
 		var v = body.getLinearVelocity();
 		return new Vec4(v.x, v.y, v.z);
 	}
 
-	public function setLinearVelocity(x:Float, y:Float, z:Float) {
+	public function setLinearVelocity(x: Float, y: Float, z: Float) {
 		v1.init(x, y, z);
 		body.setLinearVelocity(v1);
 	}
 
-	public function getAngularVelocity():Vec4 {
-		var v = body.getAngularVelocity();
+	public function getAngularVelocity(): Vec4 {
+		var v: Vec3 = body.getAngularVelocity();
 		return new Vec4(v.x, v.y, v.z);
 	}
 
-	public function setAngularVelocity(x:Float, y:Float, z:Float) {
+	public function setAngularVelocity(x: Float, y: Float, z: Float) {
 		v1.init(x, y, z);
 		body.setAngularVelocity(v1);
 	}
 
-	public function setFriction(f:Float) {
+	public function setFriction(f: Float) {
 	}
 
 	public function syncTransform() {
@@ -277,7 +298,7 @@ class RigidBody extends Trait {
 	}
 }
 
-@:enum abstract Shape(Int) from Int to Int {
+@:enum abstract Shapes(Int) from Int to Int {
 	var Box = 0;
 	var Sphere = 1;
 	var Capsule = 2;
