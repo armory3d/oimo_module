@@ -95,6 +95,9 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function lateUpdate() {
+		var ts = Time.scale;
+		if (ts == 0.0) return;
+
 		#if arm_debug
 		var startTime = kha.Scheduler.realTime();
 		#end
@@ -102,7 +105,7 @@ class PhysicsWorld extends Trait {
 		if (preUpdates != null) for (f in preUpdates) f();
 
 		if (!pause) {
-			world.step(timeStep);
+			world.step(timeStep * ts);
 			updateContacts();
 			for (rb in rbMap) @:privateAccess rb.physicsUpdate();
 		}

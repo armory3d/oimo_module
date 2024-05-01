@@ -8,7 +8,6 @@ import iron.object.Transform;
 import iron.object.MeshObject;
 
 class RigidBody extends Trait {
-
 	var shape:Shape;
 
 	public var physics:PhysicsWorld;
