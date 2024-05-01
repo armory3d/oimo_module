@@ -7,6 +7,17 @@ import iron.system.Time;
 import iron.math.Vec4;
 import iron.math.RayCaster;
 
+class Hit {
+	public var rb: RigidBody;
+	public var pos: Vec4;
+	public var normal: Vec4;
+	public function new(rb: RigidBody, pos: Vec4, normal: Vec4){
+		this.rb = rb;
+		this.pos = pos;
+		this.normal = normal;
+	}
+}
+
 class ContactPair {
 	public var a:Int;
 	public var b:Int;
@@ -62,6 +73,15 @@ class PhysicsWorld extends Trait {
 		var g = iron.Scene.active.raw.gravity;
 		var gravity = g == null ? new oimo.common.Vec3(0, 0, -9.81) : new oimo.common.Vec3(g[0], g[1], g[2]);
 		world = new oimo.dynamics.World(oimo.collision.broadphase.BroadPhaseType._BVH, gravity);
+	}
+
+	public function setGravity(v: Vec4) {
+		world.setGravity(new oimo.common.Vec3(v.x, v.y, v.z));
+	}
+
+	function getGravity(): Vec4 {
+		var g = world.getGravity();
+		return new Vec4(g.x, g.y, g.z);
 	}
 
 	public function addRigidBody(body:RigidBody) {
@@ -144,11 +164,15 @@ class PhysicsWorld extends Trait {
 		return null;
 	}
 
-	public function rayCast(from:Vec4, to:Vec4):RigidBody {
+	public function rayCast(from:Vec4, to:Vec4, group:Int = 0x00000001, mask:Int = 0xFFFFFFFF):Hit {
+		// TO DO: implement groups and masks
 		rayCastResult.clear();
 		world.rayCast(new oimo.common.Vec3(from.x, from.y, from.z), new oimo.common.Vec3(to.x, to.y, to.z), rayCastResult);
-		if (rayCastResult.shape!= null) {
-			return cast (rayCastResult.shape._rigidBody.userData, RigidBody);
+		if (rayCastResult.hit) {
+			var rb = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
+			var pos = rayCastResult.position;
+			var normal = rayCastResult.normal;
+			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
 		}
 		else {
 			return null;

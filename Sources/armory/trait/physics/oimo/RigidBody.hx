@@ -210,6 +210,14 @@ class RigidBody extends Trait {
 	public function setActivationState(newState:Int) {
 	}
 
+	public function applyForce(force:Vec4, loc:Vec4 = null) {
+		activate();
+		if (loc == null) loc = transform.loc;
+		v1.init(force.x, force.y, force.z);
+		v2.init(loc.x, loc.y, loc.z);
+		body.applyForce(v1, v2);
+	}
+
 	public function applyImpulse(impulse:Vec4, loc:Vec4 = null) {
 		activate();
 		if (loc == null) loc = transform.loc;
@@ -218,12 +226,10 @@ class RigidBody extends Trait {
 		body.applyImpulse(v1, v2);
 	}
 
-	public function applyForce(force:Vec4, loc:Vec4 = null) {
+	public function applyTorque(torque:Vec4) {
 		activate();
-		if (loc == null) loc = transform.loc;
-		v1.init(force.x, force.y, force.z);
-		v2.init(loc.x, loc.y, loc.z);
-		body.applyForce(v1, v2);
+		v1.init(torque.x, torque.y, torque.z);
+		body.applyTorque(v1);
 	}
 
 	public function setLinearFactor(x:Float, y:Float, z:Float) {
