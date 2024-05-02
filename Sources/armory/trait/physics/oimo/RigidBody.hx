@@ -64,7 +64,8 @@ class RigidBody extends Trait {
 	static var v2: Vec3 = new Vec3();
 	static var q1: Quat = new Quat();
 
-	public function new(shape: Shapes = Shapes.Box, mass: Float = 1.0, friction: Float = 0.5, restitution: Float = 0.0, group: Int = 1, mask: Int = 1, params = null, flags = null) {
+	public function new(shape: Shapes = Shapes.Box, mass: Float = 1.0, friction: Float = 0.5, restitution: Float = 0.0, group: Int = 1, mask: Int = 1, 
+						params: RigidBodyParams = null, flags: RigidBodyFlags = null) {
 		super();
 		
 		this.shape = shape;
@@ -75,7 +76,30 @@ class RigidBody extends Trait {
 		this.group = group;
 		this.mask = mask;
 
-		// 'params' and 'flags' are anonymous structures
+		if (params == null) params = {
+			linearDamping: 0.04,
+			angularDamping: 0.1,
+			angularFriction: 0.1,
+			linearFactorsX: 1.0,
+			linearFactorsY: 1.0,
+			linearFactorsZ: 1.0,
+			angularFactorsX: 1.0,
+			angularFactorsY: 1.0,
+			angularFactorsZ: 1.0,
+			collisionMargin: 0.0,
+			linearDeactivationThreshold: 0.0,
+			angularDeactivationThreshold: 0.0,
+			deactivationTime: 0.0
+		};
+
+		if (flags == null) flags = {
+			animated: false,
+			trigger: false,
+			ccd: false,
+			staticObj: false,
+			useDeactivation: true
+		};
+
 		this.collisionMargin = params.collisionMargin;
 		this.linearDamping = params.linearDamping;
 		this.angularDamping = params.angularDamping;
@@ -121,14 +145,14 @@ class RigidBody extends Trait {
 		shapeConfig.collisionMask = mask;
 
 		if (shape == Shapes.Box) {
-			v1.init(withMargin(transform.dim.x) / 2, withMargin(transform.dim.y) / 2, withMargin(transform.dim.z) / 2);
+			v1.init(withMargin(transform.dim.x) * 0.5, withMargin(transform.dim.y) * 0.5, withMargin(transform.dim.z) * 0.5);
 			shapeConfig.geometry = new BoxGeometry(
 				v1
 			);
 		}
 		else if (shape == Shapes.Sphere) {
 			shapeConfig.geometry = new SphereGeometry(
-				withMargin(transform.dim.x) / 2
+				withMargin(transform.dim.x) * 0.5
 			);
 		}
 		else if (shape == Shapes.ConvexHull || shape == Shapes.Mesh) {
@@ -152,22 +176,22 @@ class RigidBody extends Trait {
 		else if (shape == Shapes.Cone) {
 			// TODO: fix axis
 			shapeConfig.geometry = new ConeGeometry(
-				withMargin(transform.dim.x) / 2, // Radius
-				withMargin(transform.dim.y) / 2 // Half-height
+				withMargin(transform.dim.x) * 0.5, // Radius
+				withMargin(transform.dim.y) * 0.5 // Half-height
 			);
 		}
 		else if (shape == Shapes.Cylinder) {
 			// TODO: fix axis
 			shapeConfig.geometry = new CylinderGeometry(
-				withMargin(transform.dim.x) / 2, // Radius
-				withMargin(transform.dim.y) / 2 // Half-height
+				withMargin(transform.dim.x) * 0.5, // Radius
+				withMargin(transform.dim.y) * 0.5 // Half-height
 			);
 		}
 		else if (shape == Shapes.Capsule) {
 			// TODO: fix axis
 			shapeConfig.geometry = new CapsuleGeometry(
-				withMargin(transform.dim.x) / 2, // Radius
-				withMargin(transform.dim.y) / 2 // Half-height
+				withMargin(transform.dim.x) * 0.5, // Radius
+				withMargin(transform.dim.y) * 0.5 // Half-height
 			);
 		}
 
@@ -219,8 +243,22 @@ class RigidBody extends Trait {
 		}
 	}
 
+	public function disableCollision() {
+		// TODO
+		trace("TODO: disableCollision");
+	}
+
+	public function enableCollision() {
+		// TODO
+		trace("TODO: enableCollision");
+	}
+
 	public function removeFromWorld() {
 		if (physics != null) physics.removeRigidBody(this);
+	}
+
+	public function isActive() {
+		return !body.isSleeping();
 	}
 
 	public function activate() {
@@ -228,9 +266,33 @@ class RigidBody extends Trait {
 	}
 
 	public function disableGravity() {
+		body.setGravityScale(0);
+	}
+
+	public function enableGravity() {
+		body.setGravityScale(1);
 	}
 
 	public function setActivationState(newState: Int) {
+		// TODO
+		trace("TODO: setActivationState");
+	}
+
+	public function setDeactivationParams(linearThreshold: Float, angularThreshold: Float, time: Float) {
+		// TODO
+		// Not implemented in oimo.dynamics.rigidbody.RigidBody, only initialized from there
+		trace("TODO: setDeactivationParams");
+	}
+
+	public function setUpDeactivation(useDeactivation: Bool, linearThreshold: Float, angularThreshold: Float, time: Float) {
+		// TODO
+		trace("TODO: setUpDeactivation");
+	}
+
+	public function isTriggerObject(isTrigger: Bool) {
+		this.trigger = isTrigger;
+		// Not implemented in Oimo. See: https://github.com/saharan/OimoPhysics/issues/45
+		trace("Not implemented in Oimo. See: https://github.com/saharan/OimoPhysics/issues/45");
 	}
 
 	public function applyForce(force: Vec4, loc: Vec4 = null) {
@@ -255,26 +317,19 @@ class RigidBody extends Trait {
 		body.applyTorque(v1);
 	}
 
-	public function getAngularDamping(): Float {
-		return body.getAngularDamping();
-	}
-
-	public function setAngularDamping(d: Float) {
-		angularDamping = d;
-		body.setAngularDamping(angularDamping);
+	public function applyTorqueImpulse(torque: Vec4) {
+		// TODO
+		trace("TODO: applyTorqueImpulse");
 	}
 
 	public function setLinearFactor(x: Float, y: Float, z: Float) {
+		// TODO
+		trace("TODO: setLinearFactor");
 	}
 
 	public function setAngularFactor(x: Float, y: Float, z: Float) {
 		v1.init(x, y, z);
 		body.setRotationFactor(v1);
-	}
-
-	public function getPosition() {
-		var v: Vec3 = body.getPosition();
-		return new Vec4(v.x, v.y, v.z);
 	}
 
 	public function getLinearVelocity(): Vec4 {
@@ -297,7 +352,45 @@ class RigidBody extends Trait {
 		body.setAngularVelocity(v1);
 	}
 
+	public function getPointVelocity(x: Float, y: Float, z: Float): Vec4 {
+		// TODO
+		trace("TODO: getPointVelocity");
+		return new Vec4();
+	}
+
+	// These are not implemented in Bullet: getAngularDamping, setAngularDamping and getPosition
+	// public function getAngularDamping(): Float {
+	// 	return body.getAngularDamping();
+	// }
+
+	// public function setAngularDamping(d: Float) {
+	// 	angularDamping = d;
+	// 	body.setAngularDamping(angularDamping);
+	// }
+
+	// public function getPosition() {
+	// 	var v: Vec3 = body.getPosition();
+	// 	return new Vec4(v.x, v.y, v.z);
+	// }
+
 	public function setFriction(f: Float) {
+		// TODO
+		trace("TODO setFriction");
+	}
+
+	public function notifyOnContact(f: RigidBody->Void) {
+		// TODO
+		trace("TODO notifyOnContact");
+	}
+
+	public function removeContact(f: RigidBody->Void) {
+		// TODO
+		trace("TODO removeContact");
+	}
+
+	public function setScale(v: Vec4) {
+		// TODO
+		trace("TODO setScale");
 	}
 
 	public function syncTransform() {
@@ -306,6 +399,20 @@ class RigidBody extends Trait {
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
 		activate();
+	}
+
+	public function setCcd(sphereRadius: Float, motionThreshold: Float = 1e-7) {
+		// TODO
+		trace("TODO setCcd");
+	}
+
+	public function delete() {
+		// TODO
+		trace("TODO delete");
+	}
+
+	inline function deleteShape() {
+		// TODO ?
 	}
 }
 
@@ -326,4 +433,27 @@ class RigidBody extends Trait {
 	var NoSimulation = 5;
 }
 
+typedef RigidBodyParams = {
+	var linearDamping: Float;
+	var angularDamping: Float;
+	var angularFriction: Float;
+	var linearFactorsX: Float;
+	var linearFactorsY: Float;
+	var linearFactorsZ: Float;
+	var angularFactorsX: Float;
+	var angularFactorsY: Float;
+	var angularFactorsZ: Float;
+	var collisionMargin: Float;
+	var linearDeactivationThreshold: Float;
+	var angularDeactivationThreshold: Float;
+	var deactivationTime: Float;
+}
+
+typedef RigidBodyFlags = {
+	var animated: Bool;
+	var trigger: Bool;
+	var ccd: Bool;
+	var staticObj: Bool;
+	var useDeactivation: Bool;
+}
 #end
