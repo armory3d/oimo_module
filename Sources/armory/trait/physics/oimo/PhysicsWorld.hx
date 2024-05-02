@@ -48,7 +48,7 @@ class PhysicsWorld extends Trait {
 	static inline var timeStep: Float = 1 / 60;
 	static inline var fixedStep: Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
-	public var rayCastResult: RayCastMask;
+	public var rayCastResult: RayCastClosestWithMask;
 	var contacts: Array<ContactPair>;
 	public var pause: Bool = false;
 	
@@ -65,7 +65,7 @@ class PhysicsWorld extends Trait {
 
 		rbMap = new Map();
 		active = this;
-		rayCastResult = new RayCastMask();
+		rayCastResult = new RayCastClosestWithMask();
 		contacts = [];
 
 		// Ensure physics are updated first in the lateUpdate list
@@ -195,7 +195,7 @@ class PhysicsWorld extends Trait {
 	}
 }
 
-private class RayCastMask extends RayCastClosest {
+private class RayCastClosestWithMask extends RayCastClosest {
     public var group: Int;
     public var mask: Int;
 
