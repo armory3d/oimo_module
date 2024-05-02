@@ -36,29 +36,33 @@ class RigidBody extends Trait {
 
 	public var group: Int;
 	public var mask: Int;
+	public var destroyed: Bool = false;
 
-	public var linearFactor: Vec3;
-	public var angularFactor: Vec3;
-	// public var angularFriction:Float;
+	var linearFactor: Vec3;
+	var angularFactor: Vec3;
+	public var angularFriction: Float; // Not implemented in Oimo
 
-	public var linearDeactivationThreshold:Float;
-	public var angularDeactivationThreshold:Float;
-	// public var deactivationTime:Float;
+	var linearDeactivationThreshold: Float;
+	var angularDeactivationThreshold: Float;
+	// var deactivationTime: Float; // Not implemented in Blender
 
 	// Flags
 	public var animated: Bool;
-	public var trigger: Bool;
-	public var ccd: Bool;
+	var trigger: Bool;
+	var ccd: Bool;
 	public var staticObj: Bool;
-	public var useDeactivation: Bool;
+	var useDeactivation: Bool;
 
 	public var body: oimo.dynamics.rigidbody.RigidBody = null;
+	public var motionState: Int; // TODO
 	public var ready: Bool = false;
 
 	static var nextId: Int = 0;
 	public var id: Int = 0;
 
-	public var onReady: Void -> Void = null;
+	public var onReady: Void->Void = null;
+	public var onContact: Array<RigidBody->Void> = null;
+	public var heightData: haxe.io.Bytes = null;
 
 	static var v1: Vec3 = new Vec3();
 	static var v2: Vec3 = new Vec3();
