@@ -41,8 +41,8 @@ class RigidBody extends Trait {
 	public var angularFactor: Vec3;
 	// public var angularFriction:Float;
 
-	// public var linearDeactivationThreshold:Float;
-	// public var angularDeactivationThreshold:Float;
+	public var linearDeactivationThreshold:Float;
+	public var angularDeactivationThreshold:Float;
 	// public var deactivationTime:Float;
 
 	// Flags
@@ -80,13 +80,13 @@ class RigidBody extends Trait {
 		this.linearDamping = params.linearDamping;
 		this.angularDamping = params.angularDamping;
 
-		this.linearFactor = new Vec3(params.linearFactorsX, params.linearFactorsY, params.linearFactorsZ);
+		this.linearFactor = new Vec3(params.linearFactorsX, params.linearFactorsY, params.linearFactorsZ); // TODO: implement this
 		this.angularFactor = new Vec3(params.angularFactorsX, params.angularFactorsY, params.angularFactorsZ);
-		// this.angularFriction = params.angularFriction;
+		// this.angularFriction = params.angularFriction; // Not implemented in Oimo
 
-		// this.linearDeactivationThreshold = params.linearDeactivationThreshold;
-		// this.angularDeactivationThreshold = params.angularDeactivationThreshold;
-		// this.deactivationTime = params.deactivationTime;
+		this.linearDeactivationThreshold = params.linearDeactivationThreshold;
+		this.angularDeactivationThreshold = params.angularDeactivationThreshold;
+		// this.deactivationTime = params.deactivationTime; // Not implemented in Blender
 
 		this.animated = flags.animated;
 		this.trigger = flags.trigger;
@@ -177,6 +177,8 @@ class RigidBody extends Trait {
 		bodyConfig.linearDamping = linearDamping;
 		bodyConfig.angularDamping = angularDamping;
 		bodyConfig.autoSleep = useDeactivation;
+		// bodyConfig.sleepingVelocityThreshold = linearDeactivationThreshold; // Uncomment this line if https://github.com/saharan/OimoPhysics/pull/72 PR is merged
+		// bodyConfig.sleepingAngularVelocityThreshold = angularDeactivationThreshold; // Uncomment this line if https://github.com/saharan/OimoPhysics/pull/72 PR is merged
 		body = new oimo.dynamics.rigidbody.RigidBody(bodyConfig);
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
