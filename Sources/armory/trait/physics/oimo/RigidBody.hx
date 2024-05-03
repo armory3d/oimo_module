@@ -40,7 +40,7 @@ class RigidBody extends Trait {
 
 	var linearFactor: Vec3;
 	var angularFactor: Vec3;
-	public var angularFriction: Float; // Not implemented in Oimo
+	public var angularFriction: Float; // Not implemented in Oimo, see https://github.com/saharan/OimoPhysics/issues/73
 
 	var linearDeactivationThreshold: Float;
 	var angularDeactivationThreshold: Float;
@@ -205,12 +205,14 @@ class RigidBody extends Trait {
 		bodyConfig.linearDamping = linearDamping;
 		bodyConfig.angularDamping = angularDamping;
 		bodyConfig.autoSleep = useDeactivation;
-		// bodyConfig.sleepingVelocityThreshold = linearDeactivationThreshold; // Uncomment this line if https://github.com/saharan/OimoPhysics/pull/72 PR is merged
-		// bodyConfig.sleepingAngularVelocityThreshold = angularDeactivationThreshold; // Uncomment this line if https://github.com/saharan/OimoPhysics/pull/72 PR is merged
+		// Uncomment the following 3 lines if https://github.com/saharan/OimoPhysics/pull/72 PR is merged
+		// bodyConfig.sleepingVelocityThreshold = linearDeactivationThreshold;
+		// bodyConfig.sleepingAngularVelocityThreshold = angularDeactivationThreshold;
+		// bodyConfig.sleepingTimeThreshold = deactivationTime; // Needs to be implemented in `oimo.dynamics.rigidbody.RigidBody` as well
 		body = new oimo.dynamics.rigidbody.RigidBody(bodyConfig);
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
-		// TODO: implement inertia from this.linearFactor
+		// TODO: implement inertia from `this.linearFactor`
 		// var massData: MassData = new MassData();
 		// massData.mass = mass;
 		// massData.localInertia = new Mat3();
@@ -249,7 +251,7 @@ class RigidBody extends Trait {
 
 	public function disableCollision() {
 		// TODO
-		// Set groups and masks to 0? and save the original values in _group and _mask variables
+		// Set groups and masks to 0? and save the original values in `_group` and `_mask` variables
 		trace("TODO: disableCollision");
 	}
 
@@ -283,16 +285,16 @@ class RigidBody extends Trait {
 		trace("TODO: setActivationState");
 	}
 
-	// These functions may not be necessary: 'setDeactivationParams' and 'setUpDeactivation'.
-	// These can be set up from 'bodyConfig' instead, see https://github.com/saharan/OimoPhysics/pull/72
+	// These functions may not be necessary: `setDeactivationParams` and `setUpDeactivation`.
+	// These can be set up from `bodyConfig` instead, see https://github.com/saharan/OimoPhysics/pull/72
 	// Added to go in hand with Bullet Physics module since they are both public
 	public function setDeactivationParams(linearThreshold: Float, angularThreshold: Float, time: Float) {
 		// TODO -> not implemented in Oimo
-		// 'time' is not implemented in Blender (or at least not visible in the inspector)
+		// `time` is not implemented in Blender (or at least not visible in the inspector)
 		trace("TODO: setDeactivationParams -> not implemented in Oimo");
 	}
 
-	// See https://github.com/saharan/OimoPhysics/pull/72 PR
+	// See https://github.com/saharan/OimoPhysics/pull/72
 	public function setUpDeactivation(useDeactivation: Bool, linearThreshold: Float, angularThreshold: Float, time: Float) {
 		this.useDeactivation = useDeactivation;
 		// this.linearThreshold = linearThreshold;
@@ -334,8 +336,8 @@ class RigidBody extends Trait {
 		trace("TODO: applyTorqueImpulse");
 	}
 
-	// These functions may not be necessary: 'setLinearFactor' and 'setAngularFactor'.
-	// These can be set up from 'bodyConfig' instead
+	// These functions may not be necessary: `setLinearFactor` and `setAngularFactor`.
+	// These can be set up from `bodyConfig` instead
 	// Added to go in hand with Bullet Physics module since they are both public
 	public function setLinearFactor(x: Float, y: Float, z: Float) {
 		// TODO -> high priority
