@@ -44,7 +44,7 @@ class RigidBody extends Trait {
 
 	var linearDeactivationThreshold: Float;
 	var angularDeactivationThreshold: Float;
-	// var deactivationTime: Float; // Not implemented in Blender
+	// var deactivationTime: Float; // Not implemented in Blender (or at least not visible in the inspector)
 
 	// Flags
 	public var animated: Bool;
@@ -114,7 +114,7 @@ class RigidBody extends Trait {
 
 		this.linearDeactivationThreshold = params.linearDeactivationThreshold;
 		this.angularDeactivationThreshold = params.angularDeactivationThreshold;
-		// this.deactivationTime = params.deactivationTime; // Not implemented in Blender (or at least not in the inspector)
+		// this.deactivationTime = params.deactivationTime; // Not implemented in Blender (or at least not visible in the inspector)
 
 		this.animated = flags.animated;
 		this.trigger = flags.trigger;
@@ -249,6 +249,7 @@ class RigidBody extends Trait {
 
 	public function disableCollision() {
 		// TODO
+		// Set groups and masks to 0? and save the original values in _group and _mask variables
 		trace("TODO: disableCollision");
 	}
 
@@ -278,19 +279,25 @@ class RigidBody extends Trait {
 	}
 
 	public function setActivationState(newState: Int) {
-		// TODO
+		// TODO -> low priority
 		trace("TODO: setActivationState");
 	}
 
+	// These functions may not be necessary: 'setDeactivationParams' and 'setUpDeactivation'.
+	// These can be set up from 'bodyConfig' instead, see https://github.com/saharan/OimoPhysics/pull/72
+	// Added to go in hand with Bullet Physics module since they are both public
 	public function setDeactivationParams(linearThreshold: Float, angularThreshold: Float, time: Float) {
-		// TODO
-		// Not implemented in oimo.dynamics.rigidbody.RigidBody, only initialized from there
-		trace("TODO: setDeactivationParams");
+		// TODO -> not implemented in Oimo
+		// 'time' is not implemented in Blender (or at least not visible in the inspector)
+		trace("TODO: setDeactivationParams -> not implemented in Oimo");
 	}
 
 	public function setUpDeactivation(useDeactivation: Bool, linearThreshold: Float, angularThreshold: Float, time: Float) {
-		// TODO
-		trace("TODO: setUpDeactivation");
+		this.useDeactivation = useDeactivation;
+		this.linearThreshold = linearThreshold;
+		this.angularThreshold = angularThreshold;
+		// this.deactivationTime = time; // Not implemented in Blender (or at least not visible in the inspector)
+		trace("TODO: setUpDeactivation -> not implemented in Oimo");
 	}
 
 	public function isTriggerObject(isTrigger: Bool) {
@@ -322,18 +329,22 @@ class RigidBody extends Trait {
 	}
 
 	public function applyTorqueImpulse(torque: Vec4) {
-		// TODO
+		// TODO -> low priority
 		trace("TODO: applyTorqueImpulse");
 	}
 
+	// These functions may not be necessary: 'setLinearFactor' and 'setAngularFactor'.
+	// These can be set up from 'bodyConfig' instead
+	// Added to go in hand with Bullet Physics module since they are both public
 	public function setLinearFactor(x: Float, y: Float, z: Float) {
-		// TODO
+		// TODO -> high priority
 		trace("TODO: setLinearFactor");
 	}
 
 	public function setAngularFactor(x: Float, y: Float, z: Float) {
 		v1.init(x, y, z);
 		body.setRotationFactor(v1);
+		this.angularFactor = new Vec3(x, y, z);
 	}
 
 	public function getLinearVelocity(): Vec4 {
@@ -365,24 +376,9 @@ class RigidBody extends Trait {
 		return linear.add(angular);
 	}
 
-	// These are not implemented in Bullet: getAngularDamping, setAngularDamping and getPosition
-	// public function getAngularDamping(): Float {
-	// 	return body.getAngularDamping();
-	// }
-
-	// public function setAngularDamping(d: Float) {
-	// 	angularDamping = d;
-	// 	body.setAngularDamping(angularDamping);
-	// }
-
-	// public function getPosition() {
-	// 	var v: Vec3 = body.getPosition();
-	// 	return new Vec4(v.x, v.y, v.z);
-	// }
-
 	public function setFriction(f: Float) {
-		// TODO
-		trace("TODO setFriction");
+		shape.setFriction(f);
+		this.friction = f;
 	}
 
 	public function notifyOnContact(f: RigidBody->Void) {
@@ -395,7 +391,7 @@ class RigidBody extends Trait {
 	}
 
 	public function setScale(v: Vec4) {
-		// TODO
+		// TODO -> low priority
 		trace("TODO setScale");
 	}
 
@@ -418,7 +414,7 @@ class RigidBody extends Trait {
 	}
 
 	inline function deleteShape() {
-		// TODO ?
+		// TODO (?)
 	}
 }
 
