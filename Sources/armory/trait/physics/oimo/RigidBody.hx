@@ -357,9 +357,12 @@ class RigidBody extends Trait {
 	}
 
 	public function getPointVelocity(x: Float, y: Float, z: Float): Vec4 {
-		// TODO
-		trace("TODO: getPointVelocity");
-		return new Vec4();
+		var linear: Vec4 = getLinearVelocity();
+
+		var relativePoint: Vec4 = new Vec4(x, y, z).sub(transform.world.getLoc());
+		var angular: Vec4 = getAngularVelocity().cross(relativePoint);
+
+		return linear.add(angular);
 	}
 
 	// These are not implemented in Bullet: getAngularDamping, setAngularDamping and getPosition
