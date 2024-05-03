@@ -292,10 +292,11 @@ class RigidBody extends Trait {
 		trace("TODO: setDeactivationParams -> not implemented in Oimo");
 	}
 
+	// See https://github.com/saharan/OimoPhysics/pull/72 PR
 	public function setUpDeactivation(useDeactivation: Bool, linearThreshold: Float, angularThreshold: Float, time: Float) {
 		this.useDeactivation = useDeactivation;
-		this.linearThreshold = linearThreshold;
-		this.angularThreshold = angularThreshold;
+		// this.linearThreshold = linearThreshold;
+		// this.angularThreshold = angularThreshold;
 		// this.deactivationTime = time; // Not implemented in Blender (or at least not visible in the inspector)
 		trace("TODO: setUpDeactivation -> not implemented in Oimo");
 	}
@@ -377,7 +378,8 @@ class RigidBody extends Trait {
 	}
 
 	public function setFriction(f: Float) {
-		shape.setFriction(f);
+		var bodyShape: Shape = body.getShapeList();
+		bodyShape.setFriction(f);
 		this.friction = f;
 	}
 
