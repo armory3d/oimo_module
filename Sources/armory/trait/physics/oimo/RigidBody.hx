@@ -110,11 +110,11 @@ class RigidBody extends Trait {
 
 		this.linearFactor = new Vec3(params.linearFactorsX, params.linearFactorsY, params.linearFactorsZ); // TODO: implement this
 		this.angularFactor = new Vec3(params.angularFactorsX, params.angularFactorsY, params.angularFactorsZ);
-		// this.angularFriction = params.angularFriction; // Not implemented in Oimo
+		// this.angularFriction = params.angularFriction; // Not implemented in Oimo, see https://github.com/saharan/OimoPhysics/issues/73
 
 		this.linearDeactivationThreshold = params.linearDeactivationThreshold;
 		this.angularDeactivationThreshold = params.angularDeactivationThreshold;
-		// this.deactivationTime = params.deactivationTime; // Not implemented in Blender
+		// this.deactivationTime = params.deactivationTime; // Not implemented in Blender (or at least not in the inspector)
 
 		this.animated = flags.animated;
 		this.trigger = flags.trigger;
@@ -383,13 +383,12 @@ class RigidBody extends Trait {
 	}
 
 	public function notifyOnContact(f: RigidBody->Void) {
-		// TODO
-		trace("TODO notifyOnContact");
+		if (onContact == null) onContact = [];
+		onContact.push(f);
 	}
 
 	public function removeContact(f: RigidBody->Void) {
-		// TODO
-		trace("TODO removeContact");
+		onContact.remove(f);
 	}
 
 	public function setScale(v: Vec4) {
@@ -406,8 +405,8 @@ class RigidBody extends Trait {
 	}
 
 	public function setCcd(sphereRadius: Float, motionThreshold: Float = 1e-7) {
-		// TODO
-		trace("TODO setCcd");
+		// TODO, see https://github.com/saharan/OimoPhysics/issues/9#issuecomment-363788349
+		trace("TODO setCcd, see: https://github.com/saharan/OimoPhysics/issues/9#issuecomment-363788349");
 	}
 
 	public function delete() {
