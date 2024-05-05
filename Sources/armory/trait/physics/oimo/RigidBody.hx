@@ -14,7 +14,7 @@ import oimo.collision.geometry.*;
 import oimo.common.Mat3;
 import oimo.common.Quat;
 import oimo.common.Vec3;
-// import oimo.dynamics.rigidbody.MassData;
+import oimo.dynamics.rigidbody.MassData;
 import oimo.dynamics.rigidbody.RigidBodyConfig;
 import oimo.dynamics.rigidbody.RigidBodyType;
 import oimo.dynamics.rigidbody.Shape;
@@ -144,7 +144,7 @@ class RigidBody extends Trait {
 		var shapeConfig: ShapeConfig = new ShapeConfig();
 		shapeConfig.friction = friction;
 		shapeConfig.restitution = restitution;
-		shapeConfig.density = mass > 0 ? mass : 1.0;
+		shapeConfig.density = mass / transform.dim.length();
 		shapeConfig.collisionGroup = group;
 		shapeConfig.collisionMask = mask;
 
@@ -212,14 +212,14 @@ class RigidBody extends Trait {
 		body = new oimo.dynamics.rigidbody.RigidBody(bodyConfig);
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
-		// TODO: implement inertia from `this.linearFactor`
-		// var massData: MassData = new MassData();
-		// massData.mass = mass;
-		// massData.localInertia = new Mat3();
-		// body.setMassData(massData);
 		body.setRotationFactor(angularFactor);
 		body.addShape(new Shape(shapeConfig));
 		body.userData = this;
+
+		var massData: MassData = new MassData();
+		massData.mass = mass;
+		massData.localInertia = new Mat3(linearFactor.x, 0, 0, 0, linearFactor.y, 0, 0, 0, linearFactor.z); // May not be the correct implementation, linear factor not working as expected
+		body.setMassData(massData);
 
 		id = nextId++;
 
@@ -340,8 +340,9 @@ class RigidBody extends Trait {
 	// These can be set up from `bodyConfig` instead
 	// Added to go in hand with Bullet Physics module since they are both public
 	public function setLinearFactor(x: Float, y: Float, z: Float) {
-		// TODO -> high priority
-		trace("TODO: setLinearFactor");
+		var massData: MassData = body.getMassData();
+		massData.localInertia = new Mat3(x, 0, 0, 0, y, 0, 0, 0, z); // May not be the correct implementation, linear factor not working as expected
+		body.setMassData(massData);
 	}
 
 	public function setAngularFactor(x: Float, y: Float, z: Float) {
