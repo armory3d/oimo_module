@@ -40,7 +40,7 @@ class RigidBody extends Trait {
 
 	var linearFactor: Vec3;
 	var angularFactor: Vec3;
-	public var angularFriction: Float; // Not implemented in Oimo, see https://github.com/saharan/OimoPhysics/issues/73
+	public var angularFriction: Float; // This applies rotation inertia instead of friction
 
 	var linearDeactivationThreshold: Float;
 	var angularDeactivationThreshold: Float;
@@ -108,7 +108,7 @@ class RigidBody extends Trait {
 		this.linearDamping = params.linearDamping;
 		this.angularDamping = params.angularDamping;
 
-		this.linearFactor = new Vec3(params.linearFactorsX, params.linearFactorsY, params.linearFactorsZ); // TODO: implement this
+		this.linearFactor = new Vec3(params.linearFactorsX, params.linearFactorsY, params.linearFactorsZ); // Not implemented in Oimo, see https://github.com/saharan/OimoPhysics/issues/73
 		this.angularFactor = new Vec3(params.angularFactorsX, params.angularFactorsY, params.angularFactorsZ);
 		this.angularFriction = params.angularFriction; // This applies rotation inertia instead of friction
 
@@ -341,7 +341,7 @@ class RigidBody extends Trait {
 	// Added to go in hand with Bullet Physics module since they are both public
 	public function setLinearFactor(x: Float, y: Float, z: Float) {
 		var massData: MassData = body.getMassData();
-		// Linear factor not implemented in Oimo
+		// Not implemented in Oimo, see https://github.com/saharan/OimoPhysics/issues/73
 		body.setMassData(massData);
 		this.linearFactor = new Vec3(x, y, z);
 	}
