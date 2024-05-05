@@ -218,7 +218,7 @@ class RigidBody extends Trait {
 
 		var massData: MassData = new MassData();
 		massData.mass = mass;
-		massData.localInertia = new Mat3(linearFactor.x, 0, 0, 0, linearFactor.y, 0, 0, 0, linearFactor.z); // May not be the correct implementation, linear factor not working as expected
+		massData.localInertia = new Mat3(linearFactor.x, 0, 0, 0, linearFactor.y, 0, 0, 0, linearFactor.z); // TODO: investigate implementation
 		body.setMassData(massData);
 
 		id = nextId++;
@@ -341,8 +341,9 @@ class RigidBody extends Trait {
 	// Added to go in hand with Bullet Physics module since they are both public
 	public function setLinearFactor(x: Float, y: Float, z: Float) {
 		var massData: MassData = body.getMassData();
-		massData.localInertia = new Mat3(x, 0, 0, 0, y, 0, 0, 0, z); // May not be the correct implementation, linear factor not working as expected
+		massData.localInertia = new Mat3(x, 0, 0, 0, y, 0, 0, 0, z); // TODO: investigate implementation
 		body.setMassData(massData);
+		this.linearFactor = new Vec3(x, y, z);
 	}
 
 	public function setAngularFactor(x: Float, y: Float, z: Float) {
