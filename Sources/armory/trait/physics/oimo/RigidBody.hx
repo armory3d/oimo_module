@@ -44,7 +44,7 @@ class RigidBody extends Trait {
 
 	var linearDeactivationThreshold: Float;
 	var angularDeactivationThreshold: Float;
-	// var deactivationTime: Float; // Not implemented in Blender (or at least not visible in the inspector)
+	var deactivationTime: Float; // Not implemented in Blender (or at least not visible in the inspector)
 
 	// Flags
 	public var animated: Bool;
@@ -110,11 +110,11 @@ class RigidBody extends Trait {
 
 		this.linearFactor = new Vec3(params.linearFactorsX, params.linearFactorsY, params.linearFactorsZ); // TODO: implement this
 		this.angularFactor = new Vec3(params.angularFactorsX, params.angularFactorsY, params.angularFactorsZ);
-		// this.angularFriction = params.angularFriction; // Not implemented in Oimo, see https://github.com/saharan/OimoPhysics/issues/73
+		this.angularFriction = params.angularFriction; // This applies rotation inertia instead of friction
 
 		this.linearDeactivationThreshold = params.linearDeactivationThreshold;
 		this.angularDeactivationThreshold = params.angularDeactivationThreshold;
-		// this.deactivationTime = params.deactivationTime; // Not implemented in Blender (or at least not visible in the inspector)
+		this.deactivationTime = params.deactivationTime; // Not implemented in Blender (or at least not visible in the inspector)
 
 		this.animated = flags.animated;
 		this.trigger = flags.trigger;
@@ -218,7 +218,7 @@ class RigidBody extends Trait {
 
 		var massData: MassData = new MassData();
 		massData.mass = mass;
-		massData.localInertia = new Mat3(linearFactor.x, 0, 0, 0, linearFactor.y, 0, 0, 0, linearFactor.z); // TODO: investigate implementation
+		massData.localInertia = new Mat3(angularFriction, 0, 0, 0, angularFriction, 0, 0, 0, angularFriction); // This applies rotation inertia instead of friction
 		body.setMassData(massData);
 
 		id = nextId++;
@@ -341,7 +341,7 @@ class RigidBody extends Trait {
 	// Added to go in hand with Bullet Physics module since they are both public
 	public function setLinearFactor(x: Float, y: Float, z: Float) {
 		var massData: MassData = body.getMassData();
-		massData.localInertia = new Mat3(x, 0, 0, 0, y, 0, 0, 0, z); // TODO: investigate implementation
+		// Linear factor not implemented in Oimo
 		body.setMassData(massData);
 		this.linearFactor = new Vec3(x, y, z);
 	}
