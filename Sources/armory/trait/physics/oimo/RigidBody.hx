@@ -247,6 +247,11 @@ class RigidBody extends Trait {
 			}
 			transform.buildMatrix();
 		}
+
+		if (onContact != null) {
+			var rbs: Array<RigidBody> = physics.getContacts(this);
+			if (rbs != null) for (rb in rbs) for (f in onContact) f(rb);
+		}
 	}
 
 	public function disableCollision() {
@@ -299,7 +304,7 @@ class RigidBody extends Trait {
 		this.useDeactivation = useDeactivation;
 		// this.linearThreshold = linearThreshold;
 		// this.angularThreshold = angularThreshold;
-		// this.deactivationTime = time; // Not implemented in Blender (or at least not visible in the inspector)
+		this.deactivationTime = time; // Not implemented in Blender (or at least not visible in the inspector)
 		trace("TODO: setUpDeactivation -> not implemented in Oimo");
 	}
 
