@@ -144,7 +144,7 @@ class RigidBody extends Trait {
 		var shapeConfig: ShapeConfig = new ShapeConfig();
 		shapeConfig.friction = friction;
 		shapeConfig.restitution = restitution;
-		shapeConfig.density = mass / transform.dim.length();
+		shapeConfig.density = mass / transform.dim.length(); // Dividing the `mass` by `transform.dim.length()` results in dividing it by the bounding box and not the real volume. The `mass` should be divided by the mesh volume.
 		shapeConfig.collisionGroup = group;
 		shapeConfig.collisionMask = mask;
 
@@ -159,7 +159,7 @@ class RigidBody extends Trait {
 				withMargin(transform.dim.x) * 0.5
 			);
 		}
-		else if (shape == Shapes.ConvexHull || shape == Shapes.Mesh) {
+		else if (shape == Shapes.ConvexHull || shape == Shapes.Mesh) { // This is not returning a correct collision. TODO: investigate why.
 			var md: MeshData = cast(object, MeshObject).data;
 			var positions: kha.arrays.Int16Array = md.geom.positions.values;
 			var sx: Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
