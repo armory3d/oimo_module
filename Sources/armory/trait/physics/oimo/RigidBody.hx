@@ -40,7 +40,7 @@ class RigidBody extends Trait {
 
 	var linearFactor: Vec3;
 	var angularFactor: Vec3;
-	public var angularFriction: Float; // This applies rotation inertia instead of friction
+	public var angularFriction: Float; // This applies rotation inertia instead of friction. Do not use '0' as a value.
 
 	var linearDeactivationThreshold: Float;
 	var angularDeactivationThreshold: Float;
@@ -110,7 +110,7 @@ class RigidBody extends Trait {
 
 		this.linearFactor = new Vec3(params.linearFactorsX, params.linearFactorsY, params.linearFactorsZ); // Not implemented in Oimo, see https://github.com/saharan/OimoPhysics/issues/73
 		this.angularFactor = new Vec3(params.angularFactorsX, params.angularFactorsY, params.angularFactorsZ);
-		this.angularFriction = params.angularFriction; // This applies rotation inertia instead of friction
+		this.angularFriction = params.angularFriction; // This applies rotation inertia instead of friction. Do not use '0' as a value.
 
 		this.linearDeactivationThreshold = params.linearDeactivationThreshold;
 		this.angularDeactivationThreshold = params.angularDeactivationThreshold;
@@ -159,7 +159,7 @@ class RigidBody extends Trait {
 				withMargin(transform.dim.x) * 0.5
 			);
 		}
-		else if (shape == Shapes.ConvexHull || shape == Shapes.Mesh) { // This is not returning a correct collision. TODO: investigate why.
+		else if (shape == Shapes.ConvexHull || shape == Shapes.Mesh) { // FIXME: This is not returning a correct collision, investigate why.
 			var md: MeshData = cast(object, MeshObject).data;
 			var positions: kha.arrays.Int16Array = md.geom.positions.values;
 			var sx: Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
@@ -178,21 +178,21 @@ class RigidBody extends Trait {
 			);
 		}
 		else if (shape == Shapes.Cone) {
-			// TODO: fix axis
+			// FIXME: fix axis
 			shapeConfig.geometry = new ConeGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.y) * 0.5 // Half-height
 			);
 		}
 		else if (shape == Shapes.Cylinder) {
-			// TODO: fix axis
+			// FIXME: fix axis
 			shapeConfig.geometry = new CylinderGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.y) * 0.5 // Half-height
 			);
 		}
 		else if (shape == Shapes.Capsule) {
-			// TODO: fix axis
+			// FIXME: fix axis
 			shapeConfig.geometry = new CapsuleGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.y) * 0.5 // Half-height
@@ -204,11 +204,14 @@ class RigidBody extends Trait {
 		bodyConfig.position.init(transform.worldx(), transform.worldy(), transform.worldz());
 		bodyConfig.linearDamping = linearDamping;
 		bodyConfig.angularDamping = angularDamping;
-		bodyConfig.autoSleep = useDeactivation;
-		// Uncomment the following 3 lines if https://github.com/saharan/OimoPhysics/pull/72 PR is merged
-		// bodyConfig.sleepingVelocityThreshold = linearDeactivationThreshold;
-		// bodyConfig.sleepingAngularVelocityThreshold = angularDeactivationThreshold;
-		// bodyConfig.sleepingTimeThreshold = deactivationTime; // Needs to be implemented in `oimo.dynamics.rigidbody.RigidBody` as well
+		
+		// HACK: `useDeactivation` needs to be implemented in `oimo.dynamics.rigidbody.RigidbodyConfig` and `oimo.common.Setting` as `disableSleeping`
+		if (useDeactivation) {
+			bodyConfig.sleepingVelocityThreshold = linearDeactivationThreshold;
+			bodyConfig.sleepingAngularVelocityThreshold = angularDeactivationThreshold;
+			// bodyConfig.sleepingTimeThreshold = deactivationTime; // Not implemented in Blender (or at least not visible in the inspector)
+		}
+
 		body = new oimo.dynamics.rigidbody.RigidBody(bodyConfig);
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
@@ -218,7 +221,7 @@ class RigidBody extends Trait {
 
 		var massData: MassData = new MassData();
 		massData.mass = mass;
-		massData.localInertia = new Mat3(angularFriction, 0, 0, 0, angularFriction, 0, 0, 0, angularFriction); // This applies rotation inertia instead of friction
+		massData.localInertia = new Mat3(angularFriction, 0, 0, 0, angularFriction, 0, 0, 0, angularFriction); // This applies rotation inertia instead of friction. Do not use '0' as a value.
 		body.setMassData(massData);
 
 		id = nextId++;
@@ -290,22 +293,32 @@ class RigidBody extends Trait {
 		trace("TODO: setActivationState");
 	}
 
-	// These functions may not be necessary: `setDeactivationParams` and `setUpDeactivation`.
-	// These can be set up from `bodyConfig` instead, see https://github.com/saharan/OimoPhysics/pull/72
-	// Added to go in hand with Bullet Physics module since they are both public
+	/**
+	 * [This function may not be necessary, deactivation is set up in `bodyConfig`. 
+	 * Not implemented in `oimo.dynamics.rigidbody.RigidBody`.
+	 * Added to go in had with Bullet Physics module.]
+	 * @param linearThreshold 
+	 * @param angularThreshold 
+	 * @param time 
+	 */
 	public function setDeactivationParams(linearThreshold: Float, angularThreshold: Float, time: Float) {
-		// TODO -> not implemented in Oimo
 		// `time` is not implemented in Blender (or at least not visible in the inspector)
-		trace("TODO: setDeactivationParams -> not implemented in Oimo");
+		trace("This does nothing. Not implemented in 'oimo.dynamics.rigidbody.RigidBody'.");
 	}
 
-	// See https://github.com/saharan/OimoPhysics/pull/72
+	/**
+	 * [This function may not be necessary, deactivation is set up in `bodyConfig`. 
+	 * Added to go in had with Bullet Physics module.]
+	 * @param useDeactivation 
+	 * @param linearThreshold 
+	 * @param angularThreshold 
+	 * @param time 
+	 */
 	public function setUpDeactivation(useDeactivation: Bool, linearThreshold: Float, angularThreshold: Float, time: Float) {
 		this.useDeactivation = useDeactivation;
-		// this.linearThreshold = linearThreshold;
-		// this.angularThreshold = angularThreshold;
+		this.linearDeactivationThreshold = linearThreshold;
+		this.angularDeactivationThreshold = angularThreshold;
 		this.deactivationTime = time; // Not implemented in Blender (or at least not visible in the inspector)
-		trace("TODO: setUpDeactivation -> not implemented in Oimo");
 	}
 
 	public function isTriggerObject(isTrigger: Bool) {
@@ -341,9 +354,13 @@ class RigidBody extends Trait {
 		trace("TODO: applyTorqueImpulse");
 	}
 
-	// These functions may not be necessary: `setLinearFactor` and `setAngularFactor`.
-	// These can be set up from `bodyConfig` instead
-	// Added to go in hand with Bullet Physics module since they are both public
+	/**
+	 * [This function may not be necessary. Linear factor is set up in `rigidBodyConfig`.
+	 * Added to go in had with Bullet Physics module.]
+	 * @param x 
+	 * @param y 
+	 * @param z 
+	 */
 	public function setLinearFactor(x: Float, y: Float, z: Float) {
 		var massData: MassData = body.getMassData();
 		// Not implemented in Oimo, see https://github.com/saharan/OimoPhysics/issues/73
@@ -351,6 +368,13 @@ class RigidBody extends Trait {
 		this.linearFactor = new Vec3(x, y, z);
 	}
 
+	/**
+	 * [This function may not be necessary. Angular factor is set up in `rigidBodyConfig`.
+	 * Added to go in had with Bullet Physics module.]
+	 * @param x 
+	 * @param y 
+	 * @param z 
+	 */
 	public function setAngularFactor(x: Float, y: Float, z: Float) {
 		v1.init(x, y, z);
 		body.setRotationFactor(v1);
