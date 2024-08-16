@@ -13,10 +13,10 @@ import oimo.dynamics.callback.RayCastClosest;
 import oimo.dynamics.rigidbody.Shape;
 
 class Hit {
-	public var rb: RigidBody;
-	public var pos: Vec4;
-	public var normal: Vec4;
-	public function new(rb: RigidBody, pos: Vec4, normal: Vec4){
+	public var rb:RigidBody;
+	public var pos:Vec4;
+	public var normal:Vec4;
+	public function new(rb:RigidBody, pos:Vec4, normal:Vec4) {
 		this.rb = rb;
 		this.pos = pos;
 		this.normal = normal;
@@ -24,13 +24,13 @@ class Hit {
 }
 
 class ContactPair {
-	public var a: Int;
-	public var b: Int;
-	public var posA: Vec4;
-	public var posB: Vec4;
-	public var nor: Vec4;
+	public var a:Int;
+	public var b:Int;
+	public var posA:Vec4;
+	public var posB:Vec4;
+	public var nor:Vec4;
 	public var impulse: Float;
-	public function new(a: Int, b: Int) {
+	public function new(a:Int, b:Int) {
 		this.a = a;
 		this.b = b;
 	}
@@ -41,16 +41,16 @@ class PhysicsWorld extends Trait {
 	public static var physTime = 0.0;
 	#end
 
-	public static var active: PhysicsWorld = null;
-	public var world: oimo.dynamics.World;
-	public var rbMap: Map<Int, RigidBody>;
-	var preUpdates: Array<Void->Void> = null;
-	static inline var timeStep: Float = 1 / 60;
-	static inline var fixedStep: Float = 1 / 60;
+	public static var active:PhysicsWorld = null;
+	public var world:oimo.dynamics.World;
+	public var rbMap:Map<Int, RigidBody>;
+	var preUpdates:Array<Void->Void> = null;
+	static inline var timeStep:Float = 1 / 60;
+	static inline var fixedStep:Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
-	public var rayCastResult: RayCastClosestWithMask;
-	var contacts: Array<ContactPair>;
-	public var pause: Bool = false;
+	public var rayCastResult:RayCastClosestWithMask;
+	var contacts:Array<ContactPair>;
+	public var pause:Bool = false;
 	
 	public function new() {
 		super();
@@ -74,33 +74,33 @@ class PhysicsWorld extends Trait {
 	}
 
 	function createPhysics() {
-		var g = iron.Scene.active.raw.gravity;
-		var gravity = g == null ? new Vec3(0, 0, -9.81) : new Vec3(g[0], g[1], g[2]);
+		var g:kha.arrays.Float32Array = iron.Scene.active.raw.gravity;
+		var gravity:Vec3 = g == null ? new Vec3(0, 0, -9.81) : new Vec3(g[0], g[1], g[2]);
 		world = new oimo.dynamics.World(oimo.collision.broadphase.BroadPhaseType._BVH, gravity);
 	}
 
-	public function setGravity(v: Vec4) {
+	public function setGravity(v:Vec4) {
 		world.setGravity(new Vec3(v.x, v.y, v.z));
 	}
 
-	function getGravity(): Vec4 {
-		var g = world.getGravity();
+	function getGravity():Vec4 {
+		var g:Vec3 = world.getGravity();
 		return new Vec4(g.x, g.y, g.z);
 	}
 
-	public function addRigidBody(body: RigidBody) {
+	public function addRigidBody(body:RigidBody) {
 		world.addRigidBody(body.body);
 		rbMap.set(body.id, body);
 	}
 
-	public function removeRigidBody(body: RigidBody) {
+	public function removeRigidBody(body:RigidBody) {
 		if (world != null) world.removeRigidBody(body.body);
 		rbMap.remove(body.id);
 	}
 
-	public function getContacts(body: RigidBody): Array<RigidBody> {
+	public function getContacts(body:RigidBody):Array<RigidBody> {
 		if (contacts.length == 0) return null;
-		var res: Array<RigidBody> = [];
+		var res:Array<RigidBody> = [];
 		for (c in contacts) {
 			if (c.a == body.id) res.push(rbMap.get(c.b));
 			else if (c.b == body.id) res.push(rbMap.get(c.a));
@@ -108,9 +108,9 @@ class PhysicsWorld extends Trait {
 		return res;
 	}
 
-	public function getContactPairs(body: RigidBody): Array<ContactPair> {
+	public function getContactPairs(body:RigidBody):Array<ContactPair> {
 		if (contacts.length == 0) return null;
-		var res: Array<ContactPair> = [];
+		var res:Array<ContactPair> = [];
 		for (c in contacts) {
 			if (c.a == body.id) res.push(c);
 			else if (c.b == body.id) res.push(c);
@@ -119,11 +119,11 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function lateUpdate() {
-		var ts = Time.scale;
+		var ts:Float = Time.scale;
 		if (ts == 0.0) return;
 
 		#if arm_debug
-		var startTime = kha.Scheduler.realTime();
+		var startTime:Float = kha.Scheduler.realTime();
 		#end
 
 		if (preUpdates != null) for (f in preUpdates) f();
@@ -144,14 +144,14 @@ class PhysicsWorld extends Trait {
 
 		var contact_list = world.getContactManager().getContactList();
 		while(contact_list != null) {
-			var b1 = cast (contact_list._b1.userData, RigidBody);
-			var b2 = cast (contact_list._b2.userData, RigidBody);
-			var cp = new ContactPair(b1.id, b2.id);
+			var b1:RigidBody = cast(contact_list._b1.userData, RigidBody);
+			var b2:RigidBody = cast(contact_list._b2.userData, RigidBody);
+			var cp:ContactPair = new ContactPair(b1.id, b2.id);
 			for (pt in contact_list.getManifold().getPoints()) {
 				if (pt.getDepth() > 0) {
-					var posA = pt.getPosition1();
-					var posB = pt.getPosition2();
-					var nor  = contact_list.getManifold().getNormal();
+					var posA:Vec3 = pt.getPosition1();
+					var posB:Vec3 = pt.getPosition2();
+					var nor:Vec3  = contact_list.getManifold().getNormal();
 					cp.posA = new Vec4(posA.x, posA.y, posA.z);
 					cp.posB = new Vec4(posB.x, posB.y, posB.z);
 					cp.nor  = new Vec4(nor.x,  nor.y,  nor.z );
@@ -168,7 +168,7 @@ class PhysicsWorld extends Trait {
 		return null;
 	}
 
-	public function rayCast(from: Vec4, to: Vec4, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): Hit {
+	public function rayCast(from:Vec4, to:Vec4, group:Int = 0x00000001, mask:Int = 0xFFFFFFFF):Hit {
 		rayCastResult.clear();
 		rayCastResult.group = group;
 		rayCastResult.mask = mask;
@@ -176,36 +176,36 @@ class PhysicsWorld extends Trait {
 		world.rayCast(new Vec3(from.x, from.y, from.z), new Vec3(to.x, to.y, to.z), rayCastResult);
 		
 		if (rayCastResult.hit) {
-			var rb: RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
-			var pos: Vec3 = rayCastResult.position;
-			var normal: Vec3 = rayCastResult.normal;
+			var rb:RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
+			var pos:Vec3 = rayCastResult.position;
+			var normal:Vec3 = rayCastResult.normal;
 			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
 		}
 		
 		return null;
 	}
 
-	public function notifyOnPreUpdate(f: Void -> Void) {
+	public function notifyOnPreUpdate(f:Void->Void) {
 		if (preUpdates == null) preUpdates = [];
 		preUpdates.push(f);
 	}
 
-	public function removePreUpdate(f: Void -> Void) {
+	public function removePreUpdate(f:Void->Void) {
 		preUpdates.remove(f);
 	}
 }
 
 private class RayCastClosestWithMask extends RayCastClosest {
-    public var group: Int;
-    public var mask: Int;
+    public var group:Int;
+    public var mask:Int;
 
-    public function new(group: Int = 0x00000001, mask: Int = 0xFFFFFFFF) {
+    public function new(group:Int = 0x00000001, mask:Int = 0xFFFFFFFF) {
         super();
         this.group = group;
         this.mask = mask;
 	}
 
-	override public function process(shape: Shape, hit: RayCastHit):Void {
+	override public function process(shape:Shape, hit:RayCastHit):Void {
 		if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) super.process(shape, hit);
 	}
 }
