@@ -164,7 +164,7 @@ class PhysicsWorld extends Trait {
 		}
 	} 
 
-	public function pickClosest(inputX: Float, inputY: Float): RigidBody {
+	public function pickClosest(inputX:Float, inputY:Float):RigidBody {
 		return null;
 	}
 

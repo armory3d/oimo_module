@@ -53,7 +53,7 @@ class RigidBody extends Trait {
 	public var staticObj:Bool;
 	var useDeactivation:Bool;
 
-	public var body: oimo.dynamics.rigidbody.RigidBody = null;
+	public var body:oimo.dynamics.rigidbody.RigidBody = null;
 	public var motionState:Int; // TODO
 	public var ready:Bool = false;
 
@@ -185,14 +185,14 @@ class RigidBody extends Trait {
 			);
 		}
 		else if (shape == Shapes.Cylinder) {
-			// FIXME: fix axis
+			// FIXME: fix axis. Weird behavior colliding with a capsule.
 			shapeConfig.geometry = new CylinderGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.y) * 0.5 // Half-height
 			);
 		}
 		else if (shape == Shapes.Capsule) {
-			// FIXME: fix axis
+			// FIXME: fix axis. Weird behavior colliding with a cylinder.
 			shapeConfig.geometry = new CapsuleGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.y) * 0.5 // Half-height
@@ -218,6 +218,8 @@ class RigidBody extends Trait {
 		body.setRotationFactor(angularFactor);
 		body.addShape(new Shape(shapeConfig));
 		body.userData = this;
+		// body.setIsTrigger(trigger); // Uncomment this if: https://github.com/saharan/OimoPhysics/pull/77 is merged.
+		
 
 		var massData:MassData = new MassData();
 		massData.mass = mass;
@@ -323,8 +325,8 @@ class RigidBody extends Trait {
 
 	public function isTriggerObject(isTrigger:Bool) {
 		this.trigger = isTrigger;
-		// Not implemented in Oimo. See: https://github.com/saharan/OimoPhysics/issues/45
-		trace("Not implemented in Oimo. See: https://github.com/saharan/OimoPhysics/issues/45");
+		// body.setIsTrigger(isTrigger); // Uncomment this if: https://github.com/saharan/OimoPhysics/pull/77 is merged
+		// Not implemented in the official Oimo repo yet. See: https://github.com/saharan/OimoPhysics/issues/45
 	}
 
 	public function applyForce(force:Vec4, loc:Vec4 = null) {
@@ -362,8 +364,8 @@ class RigidBody extends Trait {
 	 * @param z 
 	 */
 	public function setLinearFactor(x:Float, y:Float, z:Float) {
-		var massData: MassData = body.getMassData();
-		// Not implemented in Oimo, see https://github.com/saharan/OimoPhysics/issues/73
+		var massData:MassData = body.getMassData();
+		massData.localInertia = new Mat3(x, 0, 0, 0, y, 0, 0, 0, z); // Using local inertia as alternative, see https://github.com/saharan/OimoPhysics/issues/73
 		body.setMassData(massData);
 		this.linearFactor = new Vec3(x, y, z);
 	}
