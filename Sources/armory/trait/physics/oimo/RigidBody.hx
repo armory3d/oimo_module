@@ -22,6 +22,7 @@ import oimo.dynamics.rigidbody.ShapeConfig;
 
 class RigidBody extends Trait {
 	var shape:Shapes;
+	var currentShape:Shape;
 
 	public var physics:PhysicsWorld;
 	public var transform:Transform = null;
@@ -140,7 +141,45 @@ class RigidBody extends Trait {
 
 		transform = object.transform;
 		physics = PhysicsWorld.active;
+		
+		setShape(transform);
+		
+		var bodyConfig:RigidBodyConfig = new RigidBodyConfig();
+		bodyConfig.type = animated ? RigidBodyType.KINEMATIC : !staticObj ? RigidBodyType.DYNAMIC : RigidBodyType.STATIC;
+		bodyConfig.position.init(transform.worldx(), transform.worldy(), transform.worldz());
+		bodyConfig.linearDamping = linearDamping;
+		bodyConfig.angularDamping = angularDamping;
+		
+		// HACK: `useDeactivation` needs to be implemented in `oimo.dynamics.rigidbody.RigidbodyConfig` and `oimo.common.Setting` as `disableSleeping`
+		if (useDeactivation) {
+			bodyConfig.sleepingVelocityThreshold = linearDeactivationThreshold;
+			bodyConfig.sleepingAngularVelocityThreshold = angularDeactivationThreshold;
+			// bodyConfig.sleepingTimeThreshold = deactivationTime; // Not implemented in Blender (or at least not visible in the inspector)
+		}
 
+		body = new oimo.dynamics.rigidbody.RigidBody(bodyConfig);
+		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
+		body.setOrientation(q1);
+		body.setRotationFactor(angularFactor);
+		body.addShape(currentShape);
+		body.userData = this;
+		body.setIsTrigger(trigger);
+		
+
+		var massData:MassData = new MassData();
+		massData.mass = mass;
+		massData.localInertia = new Mat3(angularFriction, 0, 0, 0, angularFriction, 0, 0, 0, angularFriction); // This applies rotation inertia instead of friction. Do not use '0' as a value.
+		body.setMassData(massData);
+
+		id = nextId++;
+
+		physics.addRigidBody(this);
+		notifyOnRemove(removeFromWorld);
+
+		if (onReady != null) onReady();
+	}
+
+	function setShape(transform:Transform) {
 		var shapeConfig:ShapeConfig = new ShapeConfig();
 		shapeConfig.friction = friction;
 		shapeConfig.restitution = restitution;
@@ -199,39 +238,7 @@ class RigidBody extends Trait {
 			);
 		}
 
-		var bodyConfig:RigidBodyConfig = new RigidBodyConfig();
-		bodyConfig.type = animated ? RigidBodyType.KINEMATIC : !staticObj ? RigidBodyType.DYNAMIC : RigidBodyType.STATIC;
-		bodyConfig.position.init(transform.worldx(), transform.worldy(), transform.worldz());
-		bodyConfig.linearDamping = linearDamping;
-		bodyConfig.angularDamping = angularDamping;
-		
-		// HACK: `useDeactivation` needs to be implemented in `oimo.dynamics.rigidbody.RigidbodyConfig` and `oimo.common.Setting` as `disableSleeping`
-		if (useDeactivation) {
-			bodyConfig.sleepingVelocityThreshold = linearDeactivationThreshold;
-			bodyConfig.sleepingAngularVelocityThreshold = angularDeactivationThreshold;
-			// bodyConfig.sleepingTimeThreshold = deactivationTime; // Not implemented in Blender (or at least not visible in the inspector)
-		}
-
-		body = new oimo.dynamics.rigidbody.RigidBody(bodyConfig);
-		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
-		body.setOrientation(q1);
-		body.setRotationFactor(angularFactor);
-		body.addShape(new Shape(shapeConfig));
-		body.userData = this;
-		// body.setIsTrigger(trigger); // Uncomment this if: https://github.com/saharan/OimoPhysics/pull/77 is merged.
-		
-
-		var massData:MassData = new MassData();
-		massData.mass = mass;
-		massData.localInertia = new Mat3(angularFriction, 0, 0, 0, angularFriction, 0, 0, 0, angularFriction); // This applies rotation inertia instead of friction. Do not use '0' as a value.
-		body.setMassData(massData);
-
-		id = nextId++;
-
-		physics.addRigidBody(this);
-		notifyOnRemove(removeFromWorld);
-
-		if (onReady != null) onReady();
+		currentShape = new Shape(shapeConfig);
 	}
 
 	function physicsUpdate() {
@@ -325,7 +332,7 @@ class RigidBody extends Trait {
 
 	public function isTriggerObject(isTrigger:Bool) {
 		this.trigger = isTrigger;
-		// body.setIsTrigger(isTrigger); // Uncomment this if: https://github.com/saharan/OimoPhysics/pull/77 is merged
+		body.setIsTrigger(isTrigger);
 		// Not implemented in the official Oimo repo yet. See: https://github.com/saharan/OimoPhysics/issues/45
 	}
 
@@ -433,6 +440,13 @@ class RigidBody extends Trait {
 	}
 
 	public function syncTransform() {
+		// Applies scale on animated objects only
+		if (object.animation != null || animated) {
+			body.removeShape(currentShape);
+			setShape(transform);
+			body.addShape(currentShape);
+		}
+
 		v1.init(transform.worldx(), transform.worldy(), transform.worldz());
 		body.setPosition(v1);
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
