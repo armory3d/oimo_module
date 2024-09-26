@@ -441,10 +441,15 @@ class RigidBody extends Trait {
 
 	public function syncTransform() {
 		// Applies scale on animated objects only
+		// BUG: removing and adding a new shape is not raycast friendly
 		if (object.animation != null || animated) {
-			body.removeShape(currentShape);
+			var previousShape:Shape = body.getShapeList();
 			setShape(transform);
-			body.addShape(currentShape);
+
+			if (previousShape._geom._volume != currentShape._geom._volume) {
+				body.removeShape(previousShape);
+				body.addShape(currentShape);
+			}
 		}
 
 		v1.init(transform.worldx(), transform.worldy(), transform.worldz());
