@@ -163,7 +163,7 @@ class RigidBody extends Trait {
 		body.setRotationFactor(angularFactor);
 		body.addShape(currentShape);
 		body.userData = this;
-		// body.setIsTrigger(trigger);
+		// body.setIsTrigger(trigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
 		
 
 		var massData:MassData = new MassData();
@@ -181,12 +181,7 @@ class RigidBody extends Trait {
 
 	function setShape(transform:Transform) {
 		var shapeConfig:ShapeConfig = new ShapeConfig();
-		shapeConfig.friction = friction;
-		shapeConfig.restitution = restitution;
-		shapeConfig.density = mass / transform.dim.length(); // Dividing the `mass` by `transform.dim.length()` results in dividing it by the bounding box and not the real volume. The `mass` should be divided by the mesh volume.
-		shapeConfig.collisionGroup = group;
-		shapeConfig.collisionMask = mask;
-
+		
 		if (shape == Shapes.Box) {
 			v1.init(withMargin(transform.dim.x) * 0.5, withMargin(transform.dim.y) * 0.5, withMargin(transform.dim.z) * 0.5);
 			shapeConfig.geometry = new BoxGeometry(
@@ -238,6 +233,12 @@ class RigidBody extends Trait {
 			);
 		}
 
+		shapeConfig.friction = friction;
+		shapeConfig.restitution = restitution;
+		shapeConfig.density = mass / shapeConfig.geometry._volume;
+		shapeConfig.collisionGroup = group;
+		shapeConfig.collisionMask = mask;
+		
 		currentShape = new Shape(shapeConfig);
 	}
 
@@ -332,7 +333,7 @@ class RigidBody extends Trait {
 
 	public function isTriggerObject(isTrigger:Bool) {
 		this.trigger = isTrigger;
-		// body.setIsTrigger(isTrigger);
+		// body.setIsTrigger(isTrigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
 		// Not implemented in the official Oimo repo yet. See: https://github.com/saharan/OimoPhysics/issues/45
 	}
 
