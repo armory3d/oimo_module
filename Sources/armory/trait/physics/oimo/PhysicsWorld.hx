@@ -83,7 +83,7 @@ class PhysicsWorld extends Trait {
 		world.setGravity(new Vec3(v.x, v.y, v.z));
 	}
 
-	function getGravity():Vec4 {
+	public function getGravity():Vec4 {
 		var g:Vec3 = world.getGravity();
 		return new Vec4(g.x, g.y, g.z);
 	}
