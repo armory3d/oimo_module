@@ -45,7 +45,7 @@ class PhysicsWorld extends Trait {
 	public var world:oimo.dynamics.World;
 	public var rbMap:Map<Int, RigidBody>;
 	var preUpdates:Array<Void->Void> = null;
-	static var timeStep:Float = 1 / 60;
+	static var timeStep(default, null):Float;
 	static inline var fixedStep:Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
 	public var rayCastResult:RayCastClosestWithMask;
@@ -69,7 +69,9 @@ class PhysicsWorld extends Trait {
 		contacts = [];
 
 		#if kha_krom
-		timeStep = 1 / Krom.displayFrequency();
+		timeStep = kha.Display.primary != null ? 1 / Krom.displayFrequency() : 1 / 60;
+		#else
+		timeStep = 1 / 60;
 		#end
 
 		// Ensure physics are updated first in the lateUpdate list
