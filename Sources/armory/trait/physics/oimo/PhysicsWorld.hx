@@ -135,7 +135,7 @@ class PhysicsWorld extends Trait {
 		if (!pause) {
 			world.step(timeStep * ts);
 			updateContacts();
-			for (rb in rbMap) if (rb != null) @:privateAccess rb.physicsUpdate(); // HACK: added `if (rb != null)` to prevent from crashing when removing a RigidBody from `RigidBody.notifyOnContact`. Not fixed in Bullet.
+			for (rb in rbMap) { @:privateAccess try { rb.physicsUpdate(); } catch(e:haxe.Exception) { trace(e.message); } }  // HACK: see this recommendation: https://github.com/armory3d/armory/issues/3044#issuecomment-2558199944.
 		}
 
 		#if arm_debug
