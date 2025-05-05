@@ -6,9 +6,6 @@ import armory.trait.physics.oimo.PhysicsWorld.DebugDrawMode;
 import armory.ui.Canvas;
 #end
 
-import haxe.io.Bytes;
-import haxe.io.Float32Array;
-
 import iron.math.Vec4;
 
 import kha.Color;
@@ -73,7 +70,7 @@ class DebugDrawHelper extends DebugDraw {
 
 	override public function point(v:Vec3, color:Vec3):Void {
         if (g2 == null) return;
-        
+
         var p:Vec4 = worldToScreenFast(new Vec4(v.x, v.y, v.z));
         var c:Color = Color.fromFloats(color.x, color.y, color.z);
         
