@@ -72,6 +72,8 @@ class DebugDrawHelper extends DebugDraw {
     }
 
 	override public function point(v:Vec3, color:Vec3):Void {
+        if (g2 == null) return;
+        
         var p:Vec4 = worldToScreenFast(new Vec4(v.x, v.y, v.z));
         var c:Color = Color.fromFloats(color.x, color.y, color.z);
         
@@ -82,6 +84,8 @@ class DebugDrawHelper extends DebugDraw {
 	}
 
     override public function triangle(v1:Vec3, v2:Vec3, v3:Vec3, n1:Vec3, n2:Vec3, n3:Vec3, color:Vec3):Void {
+        if (g2 == null) return;
+
 		var p1:Vec4 = worldToScreenFast(new Vec4(v1.x, v1.y, v1.z));
         var p2:Vec4 = worldToScreenFast(new Vec4(v2.x, v2.y, v2.z));
         var p3:Vec4 = worldToScreenFast(new Vec4(v3.x, v3.y, v3.z));
@@ -94,6 +98,8 @@ class DebugDrawHelper extends DebugDraw {
 	}
 
     override public function line(v1:Vec3, v2:Vec3, color:Vec3):Void {
+        if (g2 == null) return;
+
 		var from:Vec4 = worldToScreenFast(new Vec4(v1.x, v1.y, v1.z));
         var to:Vec4 = worldToScreenFast(new Vec4(v2.x, v2.y, v2.z));
         var c:Color = Color.fromFloats(color.x, color.y, color.z);
