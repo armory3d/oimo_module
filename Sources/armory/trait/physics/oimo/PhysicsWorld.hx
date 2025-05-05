@@ -1,11 +1,9 @@
 package armory.trait.physics.oimo;
 
 #if arm_oimo
-
 import iron.Trait;
 import iron.system.Time;
 import iron.math.Vec4;
-import iron.math.RayCaster;
 
 import oimo.collision.geometry.RayCastHit;
 import oimo.common.Vec3;
@@ -29,7 +27,7 @@ class ContactPair {
 	public var posA:Vec4;
 	public var posB:Vec4;
 	public var nor:Vec4;
-	public var impulse: Float;
+	public var impulse:Float;
 	public function new(a:Int, b:Int) {
 		this.a = a;
 		this.b = b;
@@ -51,8 +49,11 @@ class PhysicsWorld extends Trait {
 	public var rayCastResult:RayCastClosestWithMask;
 	var contacts:Array<ContactPair>;
 	public var pause:Bool = false;
+
+	var debugDrawHelper:DebugDrawHelper = null;
 	
-	public function new() {
+	// Arguments `timeScale`, `maxSteps` and `solverIterations` are not used. They have been added to be able to use `debugDrawMode`.
+	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, debugDrawMode:DebugDrawMode = NoDebug) {
 		super();
 
 		if (active == null) {
@@ -77,6 +78,8 @@ class PhysicsWorld extends Trait {
 		// Ensure physics are updated first in the lateUpdate list
 		_lateUpdate = [lateUpdate];
 		@:privateAccess iron.App.traitLateUpdates.insert(0, lateUpdate);
+
+		setDebugDrawMode(debugDrawMode);
 	}
 
 	function createPhysics() {
@@ -199,6 +202,20 @@ class PhysicsWorld extends Trait {
 	public function removePreUpdate(f:Void->Void) {
 		preUpdates.remove(f);
 	}
+
+	public function setDebugDrawMode(debugDrawMode:DebugDrawMode) {
+		if (debugDrawHelper == null) {
+			if (debugDrawMode == NoDebug) return;
+		}
+
+		debugDrawHelper = new DebugDrawHelper(this, debugDrawMode);
+		world.setDebugDraw(debugDrawHelper);
+	}
+
+	public inline function getDebugDrawMode():DebugDrawMode {
+		if (debugDrawHelper == null) return NoDebug;
+		return debugDrawHelper.getDebugMode();
+	}
 }
 
 private class RayCastClosestWithMask extends RayCastClosest {
@@ -216,4 +233,31 @@ private class RayCastClosestWithMask extends RayCastClosest {
 	}
 }
 
+enum abstract DebugDrawMode(Int) from Int to Int {
+	var NoDebug:Int = 0;
+	var DrawWireframe:Int = 1;
+	var DrawAABB:Int = 1 << 1;
+
+	var DrawContactPoint:Int = 1 << 3;
+
+	// var DisableSleeping:Int = 1 << 4;
+
+	var DrawJoints:Int = 1 << 11;
+	var DrawJointLimits:Int = 1 << 12;
+
+	// var DrawNormals:Int = 1 << 14; // Not available in Oimo
+	var DrawBases:Int = 1 << 15;
+
+	@:op(~A) public inline function bitwiseNegate():DebugDrawMode {
+		return ~this;
+	}
+
+	@:op(A & B) public inline function bitwiseAND(other:DebugDrawMode):DebugDrawMode {
+		return this & other;
+	}
+
+	@:op(A | B) public inline function bitwiseOR(other:DebugDrawMode):DebugDrawMode {
+		return this | other;
+	}
+}
 #end
