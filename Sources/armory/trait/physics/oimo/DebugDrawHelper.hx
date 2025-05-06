@@ -36,6 +36,7 @@ class DebugDrawHelper extends DebugDraw {
         this.debugMode = debugDrawMode;
 
         wireframe = debugDrawMode & DrawWireframe != 0;
+        drawShapes = wireframe;
         drawAabbs = debugDrawMode & DrawAABB != 0;
         drawBases = debugDrawMode & DrawBases != 0;
         drawContacts = debugDrawMode & DrawContactPoint != 0;
