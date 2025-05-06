@@ -244,6 +244,7 @@ private class RayHit {
 		this.hit = hit;
 	}
 }
+
 private class RayCastClosestWithMask extends RayCastClosest {
     public var group:Int;
     public var mask:Int;
