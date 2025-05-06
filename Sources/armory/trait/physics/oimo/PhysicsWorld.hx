@@ -34,6 +34,18 @@ class ContactPair {
 	}
 }
 
+class RayHit {
+	public var from:Vec4;
+	public var to:Vec4;
+	public var hit:Bool;
+
+	public function new(from:Vec4, to:Vec4, hit:Bool) {
+		this.from = from;
+		this.to = to;
+		this.hit = hit;
+	}
+}
+
 class PhysicsWorld extends Trait {
 	#if arm_debug
 	public static var physTime = 0.0;
@@ -47,6 +59,7 @@ class PhysicsWorld extends Trait {
 	static inline var fixedStep:Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
 	public var rayCastResult:RayCastClosestWithMask;
+	public var rayHits:Array<RayHit> = [];
 	var contacts:Array<ContactPair>;
 	public var pause:Bool = false;
 
@@ -83,11 +96,10 @@ class PhysicsWorld extends Trait {
 
 		if (debugDrawMode & DrawRaycast != 0) {
 			notifyOnRender2D(function (g:kha.graphics2.Graphics) {
-				if (rayCastResult.hit) {
-					debugDrawHelper.raycast(new Vec3(rayCastResult.from.x, rayCastResult.from.y, rayCastResult.from.z), new Vec3(rayCastResult.position.x, rayCastResult.position.y, rayCastResult.position.z), true);
-				} else {
-					debugDrawHelper.raycast(new Vec3(rayCastResult.from.x, rayCastResult.from.y, rayCastResult.from.z), new Vec3(rayCastResult.to.x, rayCastResult.to.y, rayCastResult.to.z), false);
+				for (rayHit in rayHits) {
+					debugDrawHelper.raycast(new Vec3(rayHit.from.x, rayHit.from.y, rayHit.from.z), new Vec3(rayHit.to.x, rayHit.to.y, rayHit.to.z), rayHit.hit);
 				}
+				rayHits.resize(0);
 			});
 		}
 	}
@@ -189,20 +201,20 @@ class PhysicsWorld extends Trait {
 
 	public function rayCast(from:Vec4, to:Vec4, group:Int = 0x00000001, mask:Int = 0xFFFFFFFF):Hit {
 		rayCastResult.clear();
-		rayCastResult.from = from;
-		rayCastResult.to = to;
 		rayCastResult.group = group;
 		rayCastResult.mask = mask;
 
 		world.rayCast(new Vec3(from.x, from.y, from.z), new Vec3(to.x, to.y, to.z), rayCastResult);
-		
+
 		if (rayCastResult.hit) {
 			var rb:RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
 			var pos:Vec3 = rayCastResult.position;
 			var normal:Vec3 = rayCastResult.normal;
+			if (DrawRaycast != 0) rayHits.push(new RayHit(from, new Vec4(pos.x, pos.y, pos.z), true));
 			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
 		}
 
+		if (DrawRaycast != 0) rayHits.push(new RayHit(from, to, false));
 		return null;
 	}
 
@@ -231,8 +243,6 @@ class PhysicsWorld extends Trait {
 }
 
 private class RayCastClosestWithMask extends RayCastClosest {
-	public var from:Vec4 = new Vec4();
-	public var to:Vec4 = new Vec4();
     public var group:Int;
     public var mask:Int;
 
