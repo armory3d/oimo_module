@@ -441,7 +441,7 @@ class RigidBody extends Trait {
 	}
 
 	public function syncTransform() {
-		// Applies scale on animated objects only
+		// HACK: Applies scale on animated objects only. This is for animated objects that change their scale over time
 		// BUG: removing and adding a new shape is not raycast friendly
 		if (object.animation != null || animated) {
 			var previousShape:Shape = body.getShapeList();
