@@ -34,18 +34,6 @@ class ContactPair {
 	}
 }
 
-class RayHit {
-	public var from:Vec4;
-	public var to:Vec4;
-	public var hit:Bool;
-
-	public function new(from:Vec4, to:Vec4, hit:Bool) {
-		this.from = from;
-		this.to = to;
-		this.hit = hit;
-	}
-}
-
 class PhysicsWorld extends Trait {
 	#if arm_debug
 	public static var physTime = 0.0;
@@ -245,6 +233,17 @@ class PhysicsWorld extends Trait {
 	}
 }
 
+private class RayHit {
+	public var from:Vec4;
+	public var to:Vec4;
+	public var hit:Bool;
+
+	public function new(from:Vec4, to:Vec4, hit:Bool) {
+		this.from = from;
+		this.to = to;
+		this.hit = hit;
+	}
+}
 private class RayCastClosestWithMask extends RayCastClosest {
     public var group:Int;
     public var mask:Int;
