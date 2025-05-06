@@ -231,8 +231,8 @@ class PhysicsWorld extends Trait {
 }
 
 private class RayCastClosestWithMask extends RayCastClosest {
-	public var from:Vec4;
-	public var to:Vec4;
+	public var from:Vec4 = new Vec4();
+	public var to:Vec4 = new Vec4();
     public var group:Int;
     public var mask:Int;
 
