@@ -99,6 +99,9 @@ class PhysicsWorld extends Trait {
 				for (rayHit in rayHits) {
 					debugDrawHelper.raycast(new Vec3(rayHit.from.x, rayHit.from.y, rayHit.from.z), new Vec3(rayHit.to.x, rayHit.to.y, rayHit.to.z), rayHit.hit);
 				}
+			});
+
+			notifyOnUpdate(function () {
 				rayHits.resize(0);
 			});
 		}
