@@ -62,10 +62,8 @@ class DebugDrawHelper extends DebugDraw {
         
         if (g2 == null) g2 = g;
         
-        g.end();
         physicsWorld.world.debugDraw();
         g.opacity = 1.0;
-        g.begin(false);
     }
 
 	override public function point(v:Vec3, color:Vec3):Void {
