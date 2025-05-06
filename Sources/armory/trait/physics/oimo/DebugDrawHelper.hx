@@ -12,8 +12,6 @@ import kha.graphics2.Graphics;
 import oimo.common.Vec3;
 import oimo.dynamics.common.DebugDraw;
 
-using StringTools;
-
 class DebugDrawHelper extends DebugDraw {
     final physicsWorld:PhysicsWorld;
     var debugMode:DebugDrawMode = NoDebug;
