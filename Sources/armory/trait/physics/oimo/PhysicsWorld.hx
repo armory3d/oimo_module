@@ -80,6 +80,16 @@ class PhysicsWorld extends Trait {
 		@:privateAccess iron.App.traitLateUpdates.insert(0, lateUpdate);
 
 		setDebugDrawMode(debugDrawMode);
+
+		if (debugDrawMode & DrawRaycast != 0) {
+			notifyOnRender2D(function (g:kha.graphics2.Graphics) {
+				if (rayCastResult.hit) {
+					debugDrawHelper.raycast(new Vec3(rayCastResult.from.x, rayCastResult.from.y, rayCastResult.from.z), new Vec3(rayCastResult.position.x, rayCastResult.position.y, rayCastResult.position.z), true);
+				} else {
+					debugDrawHelper.raycast(new Vec3(rayCastResult.from.x, rayCastResult.from.y, rayCastResult.from.z), new Vec3(rayCastResult.to.x, rayCastResult.to.y, rayCastResult.to.z), false);
+				}
+			});
+		}
 	}
 
 	function createPhysics() {
@@ -179,6 +189,8 @@ class PhysicsWorld extends Trait {
 
 	public function rayCast(from:Vec4, to:Vec4, group:Int = 0x00000001, mask:Int = 0xFFFFFFFF):Hit {
 		rayCastResult.clear();
+		rayCastResult.from = from;
+		rayCastResult.to = to;
 		rayCastResult.group = group;
 		rayCastResult.mask = mask;
 
@@ -190,7 +202,7 @@ class PhysicsWorld extends Trait {
 			var normal:Vec3 = rayCastResult.normal;
 			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
 		}
-		
+
 		return null;
 	}
 
@@ -219,6 +231,8 @@ class PhysicsWorld extends Trait {
 }
 
 private class RayCastClosestWithMask extends RayCastClosest {
+	public var from:Vec4;
+	public var to:Vec4;
     public var group:Int;
     public var mask:Int;
 
@@ -247,6 +261,7 @@ enum abstract DebugDrawMode(Int) from Int to Int {
 
 	// var DrawNormals:Int = 1 << 14; // Not available in Oimo
 	var DrawBases:Int = 1 << 15;
+	var DrawRaycast:Int = 1 << 16;
 
 	@:op(~A) public inline function bitwiseNegate():DebugDrawMode {
 		return ~this;

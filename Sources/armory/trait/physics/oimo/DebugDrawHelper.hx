@@ -2,14 +2,10 @@ package armory.trait.physics.oimo;
 
 #if arm_oimo
 import armory.trait.physics.oimo.PhysicsWorld.DebugDrawMode;
-#if arm_ui
-import armory.ui.Canvas;
-#end
 
 import iron.math.Vec4;
 
 import kha.Color;
-import kha.Font;
 import kha.System;
 import kha.graphics2.Graphics;
 
@@ -20,10 +16,12 @@ using StringTools;
 
 class DebugDrawHelper extends DebugDraw {
     final physicsWorld:PhysicsWorld;
-    var font:Font = null;
     var debugMode:DebugDrawMode = NoDebug;
 
     var g2:Graphics;
+
+    final raycastColor:Vec3 = new Vec3(0.0, 1.0, 0.0);
+    final raycastHitColor:Vec3 = new Vec3(1.0, 0.0, 0.0);
 
     public function new(physicsWorld:PhysicsWorld, debugDrawMode:DebugDrawMode) {
         super();
@@ -32,12 +30,6 @@ class DebugDrawHelper extends DebugDraw {
 
         this.physicsWorld = physicsWorld;
         setDebugMode(debugDrawMode);
-
-        #if arm_ui
-		iron.data.Data.getFont(Canvas.defaultFontName, function(defaultFont:kha.Font) {
-			font = defaultFont;
-		});
-		#end
 
         iron.App.notifyOnRender2D(onRender2D);
     }
@@ -63,7 +55,6 @@ class DebugDrawHelper extends DebugDraw {
         if (g2 == null) g2 = g;
         
         physicsWorld.world.debugDraw();
-        g.opacity = 1.0;
     }
 
 	override public function point(v:Vec3, color:Vec3):Void {
@@ -104,6 +95,23 @@ class DebugDrawHelper extends DebugDraw {
             g2.drawLine(from.x, from.y, to.x, to.y);
         }
 	}
+
+    public function raycast(v1:Vec3, v2:Vec3, hit:Bool) {
+        if (g2 == null) return;
+
+		var from:Vec4 = worldToScreenFast(new Vec4(v1.x, v1.y, v1.z));
+        var to:Vec4 = worldToScreenFast(new Vec4(v2.x, v2.y, v2.z));
+        var c:Color;
+
+        if (hit) c = Color.fromFloats(raycastHitColor.x, raycastHitColor.y, raycastHitColor.z);
+        else c = Color.fromFloats(raycastColor.x, raycastColor.y, raycastColor.z);
+
+        if (from.w != 0 && to.w != 0) {
+            g2.color = c;
+            g2.drawLine(from.x, from.y, to.x, to.y);
+            if (hit) g2.fillRect(to.x - 2, to.y - 2, 4, 4);
+        }
+    }
 
     inline function worldToScreenFast(loc:Vec4):Vec4 {
 		final cam = iron.Scene.active.camera;
