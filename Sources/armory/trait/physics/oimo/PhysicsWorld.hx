@@ -47,12 +47,12 @@ class PhysicsWorld extends Trait {
 	static inline var fixedStep:Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
 	public var rayCastResult:RayCastClosestWithMask;
-	public var rayHits:Array<RayHit> = [];
+	public var rayCastInfos:Array<RayCastInfo> = [];
 	var contacts:Array<ContactPair>;
 	public var pause:Bool = false;
 
 	var debugDrawHelper:DebugDrawHelper = null;
-	
+
 	// Arguments `timeScale`, `maxSteps` and `solverIterations` are not used. They have been added to be able to use `debugDrawMode`.
 	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, debugDrawMode:DebugDrawMode = NoDebug) {
 		super();
@@ -84,13 +84,13 @@ class PhysicsWorld extends Trait {
 
 		if (debugDrawMode & DrawRaycast != 0) {
 			notifyOnRender2D(function (g:kha.graphics2.Graphics) {
-				for (rayHit in rayHits) {
-					debugDrawHelper.raycast(new Vec3(rayHit.from.x, rayHit.from.y, rayHit.from.z), new Vec3(rayHit.to.x, rayHit.to.y, rayHit.to.z), rayHit.hit);
+				for (rayCastInfo in rayCastInfos) {
+					debugDrawHelper.rayCast(rayCastInfo.from, rayCastInfo.to, rayCastInfo.hit);
 				}
 			});
 
 			notifyOnUpdate(function () {
-				rayHits.resize(0);
+				rayCastInfos.resize(0);
 			});
 		}
 	}
@@ -184,7 +184,7 @@ class PhysicsWorld extends Trait {
 			}
 			contact_list = contact_list.getNext();
 		}
-	} 
+	}
 
 	public function pickClosest(inputX:Float, inputY:Float):RigidBody {
 		return null;
@@ -201,11 +201,11 @@ class PhysicsWorld extends Trait {
 			var rb:RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
 			var pos:Vec3 = rayCastResult.position;
 			var normal:Vec3 = rayCastResult.normal;
-			if (DrawRaycast != 0) rayHits.push(new RayHit(from, new Vec4(pos.x, pos.y, pos.z), true));
+			if (DrawRaycast != 0) rayCastInfos.push(new RayCastInfo(from, new Vec4(pos.x, pos.y, pos.z), true));
 			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
 		}
 
-		if (DrawRaycast != 0) rayHits.push(new RayHit(from, to, false));
+		if (DrawRaycast != 0) rayCastInfos.push(new RayCastInfo(from, to, false));
 		return null;
 	}
 
@@ -233,7 +233,7 @@ class PhysicsWorld extends Trait {
 	}
 }
 
-private class RayHit {
+private class RayCastInfo {
 	public var from:Vec4;
 	public var to:Vec4;
 	public var hit:Bool;

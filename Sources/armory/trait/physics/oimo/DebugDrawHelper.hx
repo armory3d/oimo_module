@@ -18,12 +18,12 @@ class DebugDrawHelper extends DebugDraw {
 
     var g2:Graphics;
 
-    final raycastColor:Vec3 = new Vec3(0.0, 1.0, 0.0);
-    final raycastHitColor:Vec3 = new Vec3(1.0, 0.0, 0.0);
+    final rayCastColor:Vec3 = new Vec3(0.0, 1.0, 0.0);
+    final rayCastHitColor:Vec3 = new Vec3(1.0, 0.0, 0.0);
 
     public function new(physicsWorld:PhysicsWorld, debugDrawMode:DebugDrawMode) {
         super();
-        
+
         style.staticShapeColor = new Vec3(0, 1.0, 1.0);
 
         this.physicsWorld = physicsWorld;
@@ -50,9 +50,9 @@ class DebugDrawHelper extends DebugDraw {
 
     function onRender2D(g:Graphics) {
         if (getDebugMode() == NoDebug) return;
-        
+
         if (g2 == null) g2 = g;
-        
+
         physicsWorld.world.debugDraw();
     }
 
@@ -61,7 +61,7 @@ class DebugDrawHelper extends DebugDraw {
 
         var p:Vec4 = worldToScreenFast(new Vec4(v.x, v.y, v.z));
         var c:Color = Color.fromFloats(color.x, color.y, color.z);
-        
+
         if (p.w != 0) {
             g2.color = c;
             g2.fillRect(p.x - 2, p.y - 2, 4, 4);
@@ -95,15 +95,15 @@ class DebugDrawHelper extends DebugDraw {
         }
 	}
 
-    public function raycast(v1:Vec3, v2:Vec3, hit:Bool) {
+    public function rayCast(f:Vec4, t:Vec4, hit:Bool) {
         if (g2 == null) return;
 
-		var from:Vec4 = worldToScreenFast(new Vec4(v1.x, v1.y, v1.z));
-        var to:Vec4 = worldToScreenFast(new Vec4(v2.x, v2.y, v2.z));
+		var from:Vec4 = worldToScreenFast(f.clone());
+        var to:Vec4 = worldToScreenFast(t.clone());
         var c:Color;
 
-        if (hit) c = Color.fromFloats(raycastHitColor.x, raycastHitColor.y, raycastHitColor.z);
-        else c = Color.fromFloats(raycastColor.x, raycastColor.y, raycastColor.z);
+        if (hit) c = Color.fromFloats(rayCastHitColor.x, rayCastHitColor.y, rayCastHitColor.z);
+        else c = Color.fromFloats(rayCastColor.x, rayCastColor.y, rayCastColor.z);
 
         if (from.w != 0 && to.w != 0) {
             g2.color = c;
