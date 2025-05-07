@@ -46,8 +46,8 @@ class PhysicsWorld extends Trait {
 	static var timeStep(default, null):Float;
 	static inline var fixedStep:Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
-	public var rayCastResult:RayCastClosestWithMask;
-	public var rayCastInfos:Array<RayCastInfo> = [];
+	var rayCastResult:RayCastClosestWithMask;
+	var rayCastInfos:Array<RayCastInfo> = [];
 	var contacts:Array<ContactPair>;
 	public var pause:Bool = false;
 
@@ -85,7 +85,7 @@ class PhysicsWorld extends Trait {
 		if (debugDrawMode & DrawRaycast != 0) {
 			notifyOnRender2D(function (g:kha.graphics2.Graphics) {
 				for (rayCastInfo in rayCastInfos) {
-					debugDrawHelper.rayCast(rayCastInfo.from, rayCastInfo.to, rayCastInfo.hit);
+					debugDrawHelper.rayCast(rayCastInfo.from, rayCastInfo.to, rayCastInfo.hasHit);
 				}
 			});
 
@@ -236,12 +236,12 @@ class PhysicsWorld extends Trait {
 private class RayCastInfo {
 	public var from:Vec4;
 	public var to:Vec4;
-	public var hit:Bool;
+	public var hasHit:Bool;
 
-	public function new(from:Vec4, to:Vec4, hit:Bool) {
+	public function new(from:Vec4, to:Vec4, hasHit:Bool) {
 		this.from = from;
 		this.to = to;
-		this.hit = hit;
+		this.hasHit = hasHit;
 	}
 }
 
