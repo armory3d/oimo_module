@@ -4,6 +4,7 @@ package armory.trait.physics.oimo;
 import iron.Trait;
 import iron.system.Time;
 import iron.math.Vec4;
+import iron.math.Quat;
 
 import oimo.collision.geometry.RayCastHit;
 import oimo.common.Vec3;
@@ -18,6 +19,17 @@ class Hit {
 		this.rb = rb;
 		this.pos = pos;
 		this.normal = normal;
+	}
+}
+
+class ConvexHit {
+	public var pos: Vec4;
+	public var normal: Vec4;
+	public var hitFraction: Float;
+	public function new(pos: Vec4, normal: Vec4, hitFraction: Float){
+		this.pos = pos;
+		this.normal = normal;
+		this.hitFraction = hitFraction;
 	}
 }
 
@@ -46,8 +58,9 @@ class PhysicsWorld extends Trait {
 	static var timeStep(default, null):Float;
 	static inline var fixedStep:Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
-	var rayCastResult:RayCastClosestWithMask;
 	var rayCastInfos:Array<RayCastInfo> = [];
+	public var hitNormalWorld = new Vec4();
+	public var rayCastResult:RayCastClosestWithMask;
 	var contacts:Array<ContactPair>;
 	public var pause:Bool = false;
 
@@ -186,7 +199,9 @@ class PhysicsWorld extends Trait {
 		}
 	}
 
-	public function pickClosest(inputX:Float, inputY:Float):RigidBody {
+	// TODO
+	public function pickClosest(inputX:Float, inputY:Float, mask:Int = 0xFFFFFFFF):RigidBody {
+		trace("TODO");
 		return null;
 	}
 
@@ -206,6 +221,12 @@ class PhysicsWorld extends Trait {
 		}
 
 		if (DrawRaycast != 0) rayCastInfos.push(new RayCastInfo(from, to, false));
+		return null;
+	}
+
+	// TODO
+	public function convexSweepTest(rb: RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int = 0x00000001, mask = 0xFFFFFFFF): ConvexHit {
+		trace("TODO");
 		return null;
 	}
 
