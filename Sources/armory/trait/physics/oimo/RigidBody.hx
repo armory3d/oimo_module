@@ -16,12 +16,11 @@ import oimo.common.Vec3;
 import oimo.dynamics.rigidbody.MassData;
 import oimo.dynamics.rigidbody.RigidBodyConfig;
 import oimo.dynamics.rigidbody.RigidBodyType;
-import oimo.dynamics.rigidbody.Shape;
 import oimo.dynamics.rigidbody.ShapeConfig;
 
 class RigidBody extends Trait {
-	var shape:Shapes;
-	var currentShape:Shape;
+	var shape:Shape;
+	var currentShape:oimo.dynamics.rigidbody.Shape;
 
 	public var physics:PhysicsWorld;
 	public var transform:Transform = null;
@@ -68,10 +67,10 @@ class RigidBody extends Trait {
 	static var v2:Vec3 = new Vec3();
 	static var q1:Quat = new Quat();
 
-	public function new(shape:Shapes = Shapes.Box, mass:Float = 1.0, friction:Float = 0.5, restitution:Float = 0.0, group:Int = 1, mask:Int = 1, 
+	public function new(shape:Shape = Shape.Box, mass:Float = 1.0, friction:Float = 0.5, restitution:Float = 0.0, group:Int = 1, mask:Int = 1,
 						params:RigidBodyParams = null, flags:RigidBodyFlags = null) {
 		super();
-		
+
 		this.shape = shape;
 		this.mass = mass;
 		this.friction = friction;
@@ -140,15 +139,15 @@ class RigidBody extends Trait {
 
 		transform = object.transform;
 		physics = PhysicsWorld.active;
-		
+
 		setShape(transform);
-		
+
 		var bodyConfig:RigidBodyConfig = new RigidBodyConfig();
 		bodyConfig.type = animated ? RigidBodyType.KINEMATIC : !staticObj ? RigidBodyType.DYNAMIC : RigidBodyType.STATIC;
 		bodyConfig.position.init(transform.worldx(), transform.worldy(), transform.worldz());
 		bodyConfig.linearDamping = linearDamping;
 		bodyConfig.angularDamping = angularDamping;
-		
+
 		// HACK: `useDeactivation` needs to be implemented in `oimo.dynamics.rigidbody.RigidbodyConfig` and `oimo.common.Setting` as `disableSleeping`
 		if (useDeactivation) {
 			bodyConfig.sleepingVelocityThreshold = linearDeactivationThreshold;
@@ -163,7 +162,7 @@ class RigidBody extends Trait {
 		body.addShape(currentShape);
 		body.userData = this;
 		// body.setIsTrigger(trigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
-		
+
 
 		var massData:MassData = new MassData();
 		massData.mass = mass;
@@ -180,19 +179,19 @@ class RigidBody extends Trait {
 
 	function setShape(transform:Transform) {
 		var shapeConfig:ShapeConfig = new ShapeConfig();
-		
-		if (shape == Shapes.Box) {
+
+		if (shape == Shape.Box) {
 			v1.init(withMargin(transform.dim.x) * 0.5, withMargin(transform.dim.y) * 0.5, withMargin(transform.dim.z) * 0.5);
 			shapeConfig.geometry = new BoxGeometry(
 				v1
 			);
 		}
-		else if (shape == Shapes.Sphere) {
+		else if (shape == Shape.Sphere) {
 			shapeConfig.geometry = new SphereGeometry(
 				withMargin(transform.dim.x) * 0.5
 			);
 		}
-		else if (shape == Shapes.ConvexHull || shape == Shapes.Mesh) {
+		else if (shape == Shape.ConvexHull || shape == Shape.Mesh) {
 			var md:MeshData = cast(object, MeshObject).data;
 			var positions:kha.arrays.Int16Array = md.geom.positions.values;
 			var sx:Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
@@ -211,21 +210,21 @@ class RigidBody extends Trait {
 				verts
 			);
 		}
-		else if (shape == Shapes.Cone) {
+		else if (shape == Shape.Cone) {
 			shapeConfig.geometry = new ConeGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.z) * 0.5 // Half-height
 			);
 			shapeConfig.rotation = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
 		}
-		else if (shape == Shapes.Cylinder) {
+		else if (shape == Shape.Cylinder) {
 			shapeConfig.geometry = new CylinderGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.z) * 0.5 // Half-height
 			);
 			shapeConfig.rotation = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
 		}
-		else if (shape == Shapes.Capsule) {
+		else if (shape == Shape.Capsule) {
 			shapeConfig.geometry = new CapsuleGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.z) * 0.5 - withMargin(transform.dim.x) * 0.5// Half-height
@@ -238,8 +237,8 @@ class RigidBody extends Trait {
 		shapeConfig.density = mass / shapeConfig.geometry._volume;
 		shapeConfig.collisionGroup = group;
 		shapeConfig.collisionMask = mask;
-		
-		currentShape = new Shape(shapeConfig);
+
+		currentShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
 	}
 
 	function physicsUpdate() {
@@ -304,12 +303,12 @@ class RigidBody extends Trait {
 	}
 
 	/**
-	 * [This function may not be necessary, deactivation is set up in `bodyConfig`. 
+	 * [This function may not be necessary, deactivation is set up in `bodyConfig`.
 	 * Not implemented in `oimo.dynamics.rigidbody.RigidBody`.
 	 * Added to go in hand with Bullet Physics module.]
-	 * @param linearThreshold 
-	 * @param angularThreshold 
-	 * @param time 
+	 * @param linearThreshold
+	 * @param angularThreshold
+	 * @param time
 	 */
 	public function setDeactivationParams(linearThreshold:Float, angularThreshold:Float, time:Float) {
 		// `time` is not implemented in Blender (or at least not visible in the inspector)
@@ -317,12 +316,12 @@ class RigidBody extends Trait {
 	}
 
 	/**
-	 * [This function may not be necessary, deactivation is set up in `bodyConfig`. 
+	 * [This function may not be necessary, deactivation is set up in `bodyConfig`.
 	 * Added to go in hand with Bullet Physics module.]
-	 * @param useDeactivation 
-	 * @param linearThreshold 
-	 * @param angularThreshold 
-	 * @param time 
+	 * @param useDeactivation
+	 * @param linearThreshold
+	 * @param angularThreshold
+	 * @param time
 	 */
 	public function setUpDeactivation(useDeactivation:Bool, linearThreshold:Float, angularThreshold:Float, time:Float) {
 		this.useDeactivation = useDeactivation;
@@ -367,9 +366,9 @@ class RigidBody extends Trait {
 	/**
 	 * [This function may not be necessary. Linear factor is set up in `rigidBodyConfig`.
 	 * Added to go in had with Bullet Physics module.]
-	 * @param x 
-	 * @param y 
-	 * @param z 
+	 * @param x
+	 * @param y
+	 * @param z
 	 */
 	public function setLinearFactor(x:Float, y:Float, z:Float) {
 		var massData:MassData = body.getMassData();
@@ -381,9 +380,9 @@ class RigidBody extends Trait {
 	/**
 	 * [This function may not be necessary. Angular factor is set up in `rigidBodyConfig`.
 	 * Added to go in had with Bullet Physics module.]
-	 * @param x 
-	 * @param y 
-	 * @param z 
+	 * @param x
+	 * @param y
+	 * @param z
 	 */
 	public function setAngularFactor(x:Float, y:Float, z:Float) {
 		v1.init(x, y, z);
@@ -421,7 +420,7 @@ class RigidBody extends Trait {
 	}
 
 	public function setFriction(f:Float) {
-		var bodyShape:Shape = body.getShapeList();
+		var bodyShape:oimo.dynamics.rigidbody.Shape = body.getShapeList();
 		bodyShape.setFriction(f);
 		this.friction = f;
 	}
@@ -444,7 +443,7 @@ class RigidBody extends Trait {
 		// HACK: Applies scale on animated objects only. This is for animated objects that change their scale over time
 		// BUG: removing and adding a new shape is not raycast friendly
 		if (object.animation != null || animated) {
-			var previousShape:Shape = body.getShapeList();
+			var previousShape:oimo.dynamics.rigidbody.Shape = body.getShapeList();
 			setShape(transform);
 
 			if (previousShape._geom._volume != currentShape._geom._volume) {
@@ -475,7 +474,7 @@ class RigidBody extends Trait {
 	}
 }
 
-@:enum abstract Shapes(Int) from Int to Int {
+@:enum abstract Shape(Int) from Int to Int {
 	var Box = 0;
 	var Sphere = 1;
 	var Capsule = 6;
