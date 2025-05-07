@@ -108,6 +108,11 @@ class PhysicsWorld extends Trait {
 		}
 	}
 
+	// TODO
+	public function reset() {
+		trace("TODO");
+	}
+
 	function createPhysics() {
 		var g:kha.arrays.Float32Array = iron.Scene.active.raw.gravity;
 		var gravity:Vec3 = g == null ? new Vec3(0, 0, -9.81) : new Vec3(g[0], g[1], g[2]);
@@ -128,9 +133,19 @@ class PhysicsWorld extends Trait {
 		rbMap.set(body.id, body);
 	}
 
+	// TODO
+	public function addPhysicsConstraint(constraint:PhysicsConstraint) {
+		trace("TODO");
+	}
+
 	public function removeRigidBody(body:RigidBody) {
 		if (world != null) world.removeRigidBody(body.body);
 		rbMap.remove(body.id);
+	}
+
+	// TODO
+	public function removePhysicsConstraint(constraint:PhysicsConstraint) {
+		trace("TODO");
 	}
 
 	public function getContacts(body:RigidBody):Array<RigidBody> {
@@ -151,6 +166,12 @@ class PhysicsWorld extends Trait {
 			else if (c.b == body.id) res.push(c);
 		}
 		return res;
+	}
+
+	// TODO
+	public function findBody(id:Int):RigidBody {
+		trace("TODO");
+		return null;
 	}
 
 	public function lateUpdate() {
