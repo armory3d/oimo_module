@@ -1,7 +1,6 @@
 package armory.trait.physics.oimo;
 
 #if arm_oimo
-
 import armory.trait.physics.PhysicsWorld;
 
 import iron.Trait;
@@ -193,7 +192,7 @@ class RigidBody extends Trait {
 				withMargin(transform.dim.x) * 0.5
 			);
 		}
-		else if (shape == Shapes.ConvexHull || shape == Shapes.Mesh) { // FIXME: This is not returning a correct collision, investigate why.
+		else if (shape == Shapes.ConvexHull || shape == Shapes.Mesh) {
 			var md:MeshData = cast(object, MeshObject).data;
 			var positions:kha.arrays.Int16Array = md.geom.positions.values;
 			var sx:Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
@@ -207,30 +206,31 @@ class RigidBody extends Trait {
 					positions[i * 4 + 2] * sz
 				));
 			}
+
 			shapeConfig.geometry = new ConvexHullGeometry(
 				verts
 			);
 		}
 		else if (shape == Shapes.Cone) {
-			// FIXME: fix axis
 			shapeConfig.geometry = new ConeGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
-				withMargin(transform.dim.y) * 0.5 // Half-height
+				withMargin(transform.dim.z) * 0.5 // Half-height
 			);
+			shapeConfig.rotation = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
 		}
 		else if (shape == Shapes.Cylinder) {
-			// FIXME: fix axis. Weird behavior colliding with a capsule.
 			shapeConfig.geometry = new CylinderGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
-				withMargin(transform.dim.y) * 0.5 // Half-height
+				withMargin(transform.dim.z) * 0.5 // Half-height
 			);
+			shapeConfig.rotation = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
 		}
 		else if (shape == Shapes.Capsule) {
-			// FIXME: fix axis. Weird behavior colliding with a cylinder.
 			shapeConfig.geometry = new CapsuleGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
-				withMargin(transform.dim.y) * 0.5 // Half-height
+				withMargin(transform.dim.z) * 0.5 - withMargin(transform.dim.x) * 0.5// Half-height
 			);
+			shapeConfig.rotation = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
 		}
 
 		shapeConfig.friction = friction;
@@ -478,11 +478,11 @@ class RigidBody extends Trait {
 @:enum abstract Shapes(Int) from Int to Int {
 	var Box = 0;
 	var Sphere = 1;
-	var Capsule = 2;
-	var Cylinder = 3;
+	var Capsule = 6;
+	var Cylinder = 5;
 	var Cone = 4;
-	var ConvexHull = 5;
-	var Mesh = 6;
+	var ConvexHull = 3;
+	var Mesh = 2;
 	var Terrain = 7;
 }
 
