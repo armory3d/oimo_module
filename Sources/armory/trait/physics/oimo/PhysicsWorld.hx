@@ -6,6 +6,8 @@ import iron.system.Time;
 import iron.math.Vec4;
 import iron.math.Quat;
 
+import kha.Display;
+
 import oimo.collision.geometry.RayCastHit;
 import oimo.common.Vec3;
 import oimo.dynamics.callback.RayCastClosest;
@@ -83,8 +85,8 @@ class PhysicsWorld extends Trait {
 		rayCastResult = new RayCastClosestWithMask();
 		contacts = [];
 
-		#if kha_krom
-		timeStep = kha.Display.primary != null ? 1 / Krom.displayFrequency() : 1 / 60;
+		#if !(kha_html5 || kha_debug_html5)
+		timeStep = Display.primary != null ? 1 / Display.primary.frequency : 1 / 60;
 		#else
 		timeStep = 1 / 60;
 		#end
