@@ -297,6 +297,11 @@ class RigidBody extends Trait {
 		body.setGravityScale(1);
 	}
 
+	// TODO
+	public function setGravity(v:Vec4) {
+		trace("TODO");
+	}
+
 	public function setActivationState(newState:Int) {
 		// TODO -> low priority
 		trace("TODO: setActivationState");
