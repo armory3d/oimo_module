@@ -60,7 +60,7 @@ class PhysicsWorld extends Trait {
 	static var timeStep(default, null):Float;
 	static inline var fixedStep:Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
-	var rayCastInfos:Array<RayCastInfo> = [];
+	var rayCasts:Array<TRayCast> = [];
 	public var hitNormalWorld = new Vec4();
 	public var rayCastResult:RayCastClosestWithMask;
 	var contacts:Array<ContactPair>;
@@ -99,13 +99,13 @@ class PhysicsWorld extends Trait {
 
 		if (debugDrawMode & DrawRaycast != 0) {
 			notifyOnRender2D(function (g:kha.graphics2.Graphics) {
-				for (rayCastInfo in rayCastInfos) {
-					debugDrawHelper.rayCast(rayCastInfo.from, rayCastInfo.to, rayCastInfo.hasHit);
+				for (rayCastData in rayCasts) {
+					debugDrawHelper.rayCast(rayCastData.from, rayCastData.to, rayCastData.hasHit);
 				}
 			});
 
 			notifyOnUpdate(function () {
-				rayCastInfos.resize(0);
+				rayCasts.resize(0);
 			});
 		}
 	}
@@ -239,11 +239,19 @@ class PhysicsWorld extends Trait {
 			var rb:RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
 			var pos:Vec3 = rayCastResult.position;
 			var normal:Vec3 = rayCastResult.normal;
-			if (DrawRaycast != 0) rayCastInfos.push(new RayCastInfo(from, new Vec4(pos.x, pos.y, pos.z), true));
+			if (DrawRaycast != 0) rayCasts.push({
+				from: from,
+				to: new Vec4(pos.x, pos.y, pos.z),
+				hasHit: true
+			});
 			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
 		}
 
-		if (DrawRaycast != 0) rayCastInfos.push(new RayCastInfo(from, to, false));
+		if (DrawRaycast != 0) rayCasts.push({
+			from: from,
+			to: to,
+			hasHit: false
+		});
 		return null;
 	}
 
@@ -277,18 +285,6 @@ class PhysicsWorld extends Trait {
 	}
 }
 
-private class RayCastInfo {
-	public var from:Vec4;
-	public var to:Vec4;
-	public var hasHit:Bool;
-
-	public function new(from:Vec4, to:Vec4, hasHit:Bool) {
-		this.from = from;
-		this.to = to;
-		this.hasHit = hasHit;
-	}
-}
-
 private class RayCastClosestWithMask extends RayCastClosest {
     public var group:Int;
     public var mask:Int;
@@ -302,6 +298,12 @@ private class RayCastClosestWithMask extends RayCastClosest {
 	override public function process(shape:Shape, hit:RayCastHit):Void {
 		if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) super.process(shape, hit);
 	}
+}
+typedef TRayCast = {
+	var from:Vec4;
+	var to:Vec4;
+	var hasHit:Bool;
+	@:optional var hitPoint:Vec4;
 }
 
 enum abstract DebugDrawMode(Int) from Int to Int {
