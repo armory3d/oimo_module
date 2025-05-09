@@ -226,7 +226,7 @@ class PhysicsWorld extends Trait {
 			var rb:RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
 			var pos:Vec3 = rayCastResult.position;
 			var normal:Vec3 = rayCastResult.normal;
-			if (DrawRaycast != 0) debugDrawHelper.rayCast({
+			if (getDebugDrawMode() & DrawRaycast != 0) debugDrawHelper.rayCast({
 				from: from,
 				to: new Vec4(pos.x, pos.y, pos.z),
 				hasHit: true
@@ -234,7 +234,7 @@ class PhysicsWorld extends Trait {
 			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
 		}
 
-		if (DrawRaycast != 0) debugDrawHelper.rayCast({
+		if (getDebugDrawMode() & DrawRaycast != 0) debugDrawHelper.rayCast({
 			from: from,
 			to: to,
 			hasHit: false
