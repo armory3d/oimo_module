@@ -17,7 +17,7 @@ class DebugDrawHelper extends DebugDraw {
     var debugDrawMode:DebugDrawMode = NoDebug;
 
     var g2:Graphics;
-    var rayCasts:Array<TRayCast> = [];
+    var rayCasts:Array<TRayCastData> = [];
 
     final rayCastColor:Vec3 = new Vec3(0.0, 1.0, 0.0);
     final rayCastHitColor:Vec3 = new Vec3(1.0, 0.0, 0.0);
@@ -107,7 +107,7 @@ class DebugDrawHelper extends DebugDraw {
         }
 	}
 
-    public function rayCast(rayCastData:TRayCast) {
+    public function rayCast(rayCastData:TRayCastData) {
         rayCasts.push(rayCastData);
     }
 
@@ -146,7 +146,7 @@ class DebugDrawHelper extends DebugDraw {
 	}
 }
 
-typedef TRayCast = {
+typedef TRayCastData = {
 	var from:Vec4;
 	var to:Vec4;
 	var hasHit:Bool;
