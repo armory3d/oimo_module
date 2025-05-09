@@ -216,6 +216,8 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function rayCast(from:Vec4, to:Vec4, group:Int = 0x00000001, mask:Int = 0xFFFFFFFF):Hit {
+		var hitInfo:Hit = null;
+
 		rayCastResult.clear();
 		rayCastResult.group = group;
 		rayCastResult.mask = mask;
@@ -224,22 +226,20 @@ class PhysicsWorld extends Trait {
 
 		if (rayCastResult.hit) {
 			var rb:RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
-			var pos:Vec3 = rayCastResult.position;
-			var normal:Vec3 = rayCastResult.normal;
-			if (getDebugDrawMode() & DrawRaycast != 0) debugDrawHelper.rayCast({
-				from: from,
-				to: new Vec4(pos.x, pos.y, pos.z),
-				hasHit: true
-			});
-			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
+			hitPointWorld.set(rayCastResult.position.x, rayCastResult.position.y, rayCastResult.position.z);
+			hitNormalWorld.set(rayCastResult.normal.x, rayCastResult.normal.y, rayCastResult.normal.z);
+			hitInfo = new Hit(rb, hitPointWorld, hitNormalWorld);
 		}
 
 		if (getDebugDrawMode() & DrawRaycast != 0) debugDrawHelper.rayCast({
 			from: from,
 			to: to,
-			hasHit: false
+			hasHit: rayCastResult.hit,
+			hitPoint: hitPointWorld,
+			hitNormal: hitNormalWorld
 		});
-		return null;
+
+		return hitInfo;
 	}
 
 	// TODO

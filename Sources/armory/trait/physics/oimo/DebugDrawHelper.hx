@@ -63,7 +63,12 @@ class DebugDrawHelper extends DebugDraw {
 
         if (debugDrawMode & DrawRaycast != 0) {
             for (rayCastData in rayCasts) {
-                drawRayCast(rayCastData.from, rayCastData.to, rayCastData.hasHit);
+                if (rayCastData.hasHit) {
+                    drawRayCast(rayCastData.from, rayCastData.hitPoint, true);
+                    drawHitPoint(rayCastData.hitPoint);
+                } else {
+                    drawRayCast(rayCastData.from, rayCastData.to, false);
+                }
             }
         }
     }
@@ -124,8 +129,13 @@ class DebugDrawHelper extends DebugDraw {
         if (from.w != 0 && to.w != 0) {
             g2.color = c;
             g2.drawLine(from.x, from.y, to.x, to.y);
-            if (hit) g2.fillRect(to.x - 2, to.y - 2, 4, 4);
         }
+    }
+
+    function drawHitPoint(hp:Vec4) {
+        var hitPoint:Vec4 = worldToScreenFast(hp.clone());
+        final c = Color.fromFloats(rayCastHitColor.x, rayCastHitColor.y, rayCastHitColor.z);
+        g2.fillRect(hitPoint.x - 2, hitPoint.y - 2, 4, 4);
     }
 
     inline function worldToScreenFast(loc:Vec4):Vec4 {
@@ -151,5 +161,6 @@ typedef TRayCastData = {
 	var to:Vec4;
 	var hasHit:Bool;
 	@:optional var hitPoint:Vec4;
+    @:optional var hitNormal:Vec4;
 }
 #end
