@@ -60,7 +60,6 @@ class PhysicsWorld extends Trait {
 	static var timeStep(default, null):Float;
 	static inline var fixedStep:Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
-	var rayCasts:Array<TRayCast> = [];
 	public var hitNormalWorld = new Vec4();
 	public var rayCastResult:RayCastClosestWithMask;
 	var contacts:Array<ContactPair>;
@@ -96,18 +95,6 @@ class PhysicsWorld extends Trait {
 		@:privateAccess iron.App.traitLateUpdates.insert(0, lateUpdate);
 
 		setDebugDrawMode(debugDrawMode);
-
-		if (debugDrawMode & DrawRaycast != 0) {
-			notifyOnRender2D(function (g:kha.graphics2.Graphics) {
-				for (rayCastData in rayCasts) {
-					debugDrawHelper.rayCast(rayCastData.from, rayCastData.to, rayCastData.hasHit);
-				}
-			});
-
-			notifyOnUpdate(function () {
-				rayCasts.resize(0);
-			});
-		}
 	}
 
 	// TODO
@@ -239,7 +226,7 @@ class PhysicsWorld extends Trait {
 			var rb:RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
 			var pos:Vec3 = rayCastResult.position;
 			var normal:Vec3 = rayCastResult.normal;
-			if (DrawRaycast != 0) rayCasts.push({
+			if (DrawRaycast != 0) debugDrawHelper.rayCast({
 				from: from,
 				to: new Vec4(pos.x, pos.y, pos.z),
 				hasHit: true
@@ -247,7 +234,7 @@ class PhysicsWorld extends Trait {
 			return new Hit(rb, new Vec4(pos.x, pos.y, pos.z), new Vec4(normal.x, normal.y, normal.z));
 		}
 
-		if (DrawRaycast != 0) rayCasts.push({
+		if (DrawRaycast != 0) debugDrawHelper.rayCast({
 			from: from,
 			to: to,
 			hasHit: false
@@ -298,12 +285,6 @@ private class RayCastClosestWithMask extends RayCastClosest {
 	override public function process(shape:Shape, hit:RayCastHit):Void {
 		if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) super.process(shape, hit);
 	}
-}
-typedef TRayCast = {
-	var from:Vec4;
-	var to:Vec4;
-	var hasHit:Bool;
-	@:optional var hitPoint:Vec4;
 }
 
 enum abstract DebugDrawMode(Int) from Int to Int {

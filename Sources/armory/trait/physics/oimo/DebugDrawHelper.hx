@@ -14,9 +14,10 @@ import oimo.dynamics.common.DebugDraw;
 
 class DebugDrawHelper extends DebugDraw {
     final physicsWorld:PhysicsWorld;
-    var debugMode:DebugDrawMode = NoDebug;
+    var debugDrawMode:DebugDrawMode = NoDebug;
 
     var g2:Graphics;
+    var rayCasts:Array<TRayCast> = [];
 
     final rayCastColor:Vec3 = new Vec3(0.0, 1.0, 0.0);
     final rayCastHitColor:Vec3 = new Vec3(1.0, 0.0, 0.0);
@@ -30,10 +31,16 @@ class DebugDrawHelper extends DebugDraw {
         setDebugMode(debugDrawMode);
 
         iron.App.notifyOnRender2D(onRender2D);
+
+        if (debugDrawMode & DrawRaycast != 0) {
+			iron.App.notifyOnUpdate(function () {
+				rayCasts.resize(0);
+			});
+		}
     }
 
     public function setDebugMode(debugDrawMode:DebugDrawMode) {
-        this.debugMode = debugDrawMode;
+        this.debugDrawMode = debugDrawMode;
 
         wireframe = debugDrawMode & DrawWireframe != 0;
         drawShapes = wireframe;
@@ -45,15 +52,20 @@ class DebugDrawHelper extends DebugDraw {
     }
 
     public function getDebugMode():DebugDrawMode {
-        return debugMode;
+        return debugDrawMode;
     }
 
     function onRender2D(g:Graphics) {
         if (getDebugMode() == NoDebug) return;
-
         if (g2 == null) g2 = g;
 
         physicsWorld.world.debugDraw();
+
+        if (debugDrawMode & DrawRaycast != 0) {
+            for (rayCastData in rayCasts) {
+                drawRayCast(rayCastData.from, rayCastData.to, rayCastData.hasHit);
+            }
+        }
     }
 
 	override public function point(v:Vec3, color:Vec3):Void {
@@ -95,7 +107,11 @@ class DebugDrawHelper extends DebugDraw {
         }
 	}
 
-    public function rayCast(f:Vec4, t:Vec4, hit:Bool) {
+    public function rayCast(rayCastData:TRayCast) {
+        rayCasts.push(rayCastData);
+    }
+
+    function drawRayCast(f:Vec4, t:Vec4, hit:Bool) {
         if (g2 == null) return;
 
 		var from:Vec4 = worldToScreenFast(f.clone());
@@ -128,5 +144,12 @@ class DebugDrawHelper extends DebugDraw {
 
 		return loc;
 	}
+}
+
+typedef TRayCast = {
+	var from:Vec4;
+	var to:Vec4;
+	var hasHit:Bool;
+	@:optional var hitPoint:Vec4;
 }
 #end
