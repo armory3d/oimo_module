@@ -84,11 +84,7 @@ class PhysicsWorld extends Trait {
 		rayCastResult = new RayCastClosestWithMask();
 		contacts = [];
 
-		#if !(kha_html5 || kha_debug_html5)
-		timeStep = Display.primary != null ? 1 / Display.primary.frequency : 1 / 60;
-		#else
-		timeStep = 1 / 60;
-		#end
+		timeStep = Time.delta;
 
 		// Ensure physics are updated first in the lateUpdate list
 		_lateUpdate = [lateUpdate];
