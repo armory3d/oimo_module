@@ -6,8 +6,6 @@ import iron.system.Time;
 import iron.math.Vec4;
 import iron.math.Quat;
 
-import kha.Display;
-
 import oimo.collision.geometry.RayCastHit;
 import oimo.common.Vec3;
 import oimo.dynamics.callback.RayCastClosest;
@@ -57,7 +55,6 @@ class PhysicsWorld extends Trait {
 	public var world:oimo.dynamics.World;
 	public var rbMap:Map<Int, RigidBody>;
 	var preUpdates:Array<Void->Void> = null;
-	static var timeStep(default, null):Float;
 	static inline var fixedStep:Float = 1 / 60;
 	public var hitPointWorld = new Vec4();
 	public var hitNormalWorld = new Vec4();
@@ -83,12 +80,6 @@ class PhysicsWorld extends Trait {
 		active = this;
 		rayCastResult = new RayCastClosestWithMask();
 		contacts = [];
-
-		#if !(kha_html5 || kha_debug_html5)
-		timeStep = Display.primary != null ? 1 / Display.primary.frequency : 1 / 60;
-		#else
-		timeStep = 1 / 60;
-		#end
 
 		// Ensure physics are updated first in the lateUpdate list
 		_lateUpdate = [lateUpdate];
@@ -174,7 +165,7 @@ class PhysicsWorld extends Trait {
 		if (preUpdates != null) for (f in preUpdates) f();
 
 		if (!pause) {
-			world.step(timeStep * ts);
+			world.step(fixedStep * ts);
 			updateContacts();
 			for (rb in rbMap) { @:privateAccess try { rb.physicsUpdate(); } catch(e:haxe.Exception) { trace(e.message); } } // HACK: see this recommendation: https://github.com/armory3d/armory/issues/3044#issuecomment-2558199944.
 		}

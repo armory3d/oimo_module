@@ -138,6 +138,7 @@ class RigidBody extends Trait {
 		ready = true;
 
 		transform = object.transform;
+		transform.buildMatrix();
 		physics = PhysicsWorld.active;
 
 		setShape(transform);
