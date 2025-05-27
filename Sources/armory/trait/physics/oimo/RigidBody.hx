@@ -19,56 +19,56 @@ import oimo.dynamics.rigidbody.RigidBodyType;
 import oimo.dynamics.rigidbody.ShapeConfig;
 
 class RigidBody extends Trait {
-	var shape:Shape;
-	var currentShape:oimo.dynamics.rigidbody.Shape;
+	var shape: Shape;
+	var currentShape: oimo.dynamics.rigidbody.Shape;
 
-	public var physics:PhysicsWorld;
-	public var transform:Transform = null;
+	public var physics: PhysicsWorld;
+	public var transform: Transform = null;
 
 	// Params
-	public var mass:Float;
-	public var friction:Float;
-	public var restitution:Float;
-	public var collisionMargin:Float;
-	public var linearDamping:Float;
-	public var angularDamping:Float;
+	public var mass: Float;
+	public var friction: Float;
+	public var restitution: Float;
+	public var collisionMargin: Float;
+	public var linearDamping: Float;
+	public var angularDamping: Float;
 
-	public var group:Int;
-	public var mask:Int;
-	public var destroyed:Bool = false;
+	public var group: Int;
+	public var mask: Int;
+	public var destroyed: Bool = false;
 
-	var linearFactor:Vec3;
-	var angularFactor:Vec3;
-	public var angularFriction:Float; // This applies rotation inertia instead of friction. Do not use '0' as a value.
+	var linearFactor: Vec3;
+	var angularFactor: Vec3;
+	public var angularFriction: Float; // This applies rotation inertia instead of friction. Do not use '0' as a value.
 
-	var linearDeactivationThreshold:Float;
-	var angularDeactivationThreshold:Float;
-	var deactivationTime:Float; // Not implemented in Blender (or at least not visible in the inspector)
+	var linearDeactivationThreshold: Float;
+	var angularDeactivationThreshold: Float;
+	var deactivationTime: Float; // Not implemented in Blender (or at least not visible in the inspector)
 
 	// Flags
-	public var animated:Bool;
-	var trigger:Bool;
-	var ccd:Bool;
-	public var staticObj:Bool;
-	var useDeactivation:Bool;
+	public var animated: Bool;
+	var trigger: Bool;
+	var ccd: Bool;
+	public var staticObj: Bool;
+	var useDeactivation: Bool;
 
-	public var body:oimo.dynamics.rigidbody.RigidBody = null;
-	public var motionState:Int; // TODO
-	public var ready:Bool = false;
+	public var body: oimo.dynamics.rigidbody.RigidBody = null;
+	public var motionState: Int; // TODO
+	public var ready: Bool = false;
 
-	static var nextId:Int = 0;
-	public var id:Int = 0;
+	static var nextId: Int = 0;
+	public var id: Int = 0;
 
-	public var onReady:Void->Void = null;
-	public var onContact:Array<RigidBody->Void> = null;
-	public var heightData:haxe.io.Bytes = null;
+	public var onReady: Void->Void = null;
+	public var onContact: Array<RigidBody->Void> = null;
+	public var heightData: haxe.io.Bytes = null;
 
-	static var v1:Vec3 = new Vec3();
-	static var v2:Vec3 = new Vec3();
-	static var q1:Quat = new Quat();
+	static var v1: Vec3 = new Vec3();
+	static var v2: Vec3 = new Vec3();
+	static var q1: Quat = new Quat();
 
-	public function new(shape:Shape = Shape.Box, mass:Float = 1.0, friction:Float = 0.5, restitution:Float = 0.0, group:Int = 1, mask:Int = 1,
-						params:RigidBodyParams = null, flags:RigidBodyFlags = null) {
+	public function new(shape: Shape = Shape.Box, mass: Float = 1.0, friction: Float = 0.5, restitution: Float = 0.0, group: Int = 1, mask: Int = 1,
+						params: RigidBodyParams = null, flags: RigidBodyFlags = null) {
 		super();
 
 		this.shape = shape;
@@ -124,11 +124,11 @@ class RigidBody extends Trait {
 		notifyOnAdd(init);
 	}
 
-	inline function withMargin(f:Float) {
+	inline function withMargin(f: Float) {
 		return f - f * collisionMargin;
 	}
 
-	public function notifyOnReady(f:Void->Void) {
+	public function notifyOnReady(f: Void->Void) {
 		onReady = f;
 		if (ready) onReady();
 	}
@@ -143,7 +143,7 @@ class RigidBody extends Trait {
 
 		setShape(transform);
 
-		var bodyConfig:RigidBodyConfig = new RigidBodyConfig();
+		var bodyConfig: RigidBodyConfig = new RigidBodyConfig();
 		bodyConfig.type = animated ? RigidBodyType.KINEMATIC : !staticObj ? RigidBodyType.DYNAMIC : RigidBodyType.STATIC;
 		bodyConfig.position.init(transform.worldx(), transform.worldy(), transform.worldz());
 		bodyConfig.linearDamping = linearDamping;
@@ -164,8 +164,7 @@ class RigidBody extends Trait {
 		body.userData = this;
 		// body.setIsTrigger(trigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
 
-
-		var massData:MassData = new MassData();
+		var massData: MassData = new MassData();
 		massData.mass = mass;
 		massData.localInertia = new Mat3(angularFriction, 0, 0, 0, angularFriction, 0, 0, 0, angularFriction); // This applies rotation inertia instead of friction. Do not use '0' as a value.
 		body.setMassData(massData);
@@ -178,8 +177,8 @@ class RigidBody extends Trait {
 		if (onReady != null) onReady();
 	}
 
-	function setShape(transform:Transform) {
-		var shapeConfig:ShapeConfig = new ShapeConfig();
+	function setShape(transform: Transform) {
+		var shapeConfig: ShapeConfig = new ShapeConfig();
 
 		if (shape == Shape.Box) {
 			v1.init(withMargin(transform.dim.x) * 0.5, withMargin(transform.dim.y) * 0.5, withMargin(transform.dim.z) * 0.5);
@@ -193,12 +192,12 @@ class RigidBody extends Trait {
 			);
 		}
 		else if (shape == Shape.ConvexHull || shape == Shape.Mesh) {
-			var md:MeshData = cast(object, MeshObject).data;
-			var positions:kha.arrays.Int16Array = md.geom.positions.values;
-			var sx:Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
-			var sy:Float = transform.scale.y * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
-			var sz:Float = transform.scale.z * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
-			var verts:Array<Vec3> = [];
+			var md: MeshData = cast(object, MeshObject).data;
+			var positions: kha.arrays.Int16Array = md.geom.positions.values;
+			var sx: Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sy: Float = transform.scale.y * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sz: Float = transform.scale.z * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var verts: Array<Vec3> = [];
 			for (i in 0...Std.int(positions.length / 4)) {
 				verts.push(new Vec3(
 					positions[i * 4    ] * sx,
@@ -246,10 +245,9 @@ class RigidBody extends Trait {
 		if (!ready) return;
 		if (object.animation != null || animated) {
 			syncTransform();
-		}
-		else {
-			var p:Vec3 = body.getPosition();
-			var q:Quat = body.getOrientation();
+		} else {
+			var p: Vec3 = body.getPosition();
+			var q: Quat = body.getOrientation();
 			transform.loc.set(p.x, p.y, p.z);
 			transform.rot.set(q.x, q.y, q.z, q.w);
 			if (object.parent != null) {
@@ -262,7 +260,7 @@ class RigidBody extends Trait {
 		}
 
 		if (onContact != null) {
-			var rbs:Array<RigidBody> = physics.getContacts(this);
+			var rbs: Array<RigidBody> = physics.getContacts(this);
 			if (rbs != null) for (rb in rbs) for (f in onContact) f(rb);
 		}
 	}
@@ -299,11 +297,11 @@ class RigidBody extends Trait {
 	}
 
 	// TODO
-	public function setGravity(v:Vec4) {
+	public function setGravity(v: Vec4) {
 		trace("TODO");
 	}
 
-	public function setActivationState(newState:Int) {
+	public function setActivationState(newState: Int) {
 		// TODO -> low priority
 		trace("TODO: setActivationState");
 	}
@@ -316,7 +314,7 @@ class RigidBody extends Trait {
 	 * @param angularThreshold
 	 * @param time
 	 */
-	public function setDeactivationParams(linearThreshold:Float, angularThreshold:Float, time:Float) {
+	public function setDeactivationParams(linearThreshold: Float, angularThreshold: Float, time: Float) {
 		// `time` is not implemented in Blender (or at least not visible in the inspector)
 		trace("This does nothing. Not implemented in 'oimo.dynamics.rigidbody.RigidBody'.");
 	}
@@ -329,20 +327,20 @@ class RigidBody extends Trait {
 	 * @param angularThreshold
 	 * @param time
 	 */
-	public function setUpDeactivation(useDeactivation:Bool, linearThreshold:Float, angularThreshold:Float, time:Float) {
+	public function setUpDeactivation(useDeactivation: Bool, linearThreshold: Float, angularThreshold: Float, time: Float) {
 		this.useDeactivation = useDeactivation;
 		this.linearDeactivationThreshold = linearThreshold;
 		this.angularDeactivationThreshold = angularThreshold;
 		this.deactivationTime = time; // Not implemented in Blender (or at least not visible in the inspector)
 	}
 
-	public function isTriggerObject(isTrigger:Bool) {
+	public function isTriggerObject(isTrigger: Bool) {
 		this.trigger = isTrigger;
 		// body.setIsTrigger(isTrigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
 		// Not implemented in the official Oimo repo yet. See: https://github.com/saharan/OimoPhysics/issues/45
 	}
 
-	public function applyForce(force:Vec4, loc:Vec4 = null) {
+	public function applyForce(force: Vec4, loc: Vec4 = null) {
 		activate();
 		if (loc == null) loc = transform.loc;
 		v1.init(force.x, force.y, force.z);
@@ -350,7 +348,7 @@ class RigidBody extends Trait {
 		body.applyForce(v1, v2);
 	}
 
-	public function applyImpulse(impulse:Vec4, loc:Vec4 = null) {
+	public function applyImpulse(impulse: Vec4, loc: Vec4 = null) {
 		activate();
 		if (loc == null) loc = transform.loc;
 		v1.init(impulse.x, impulse.y, impulse.z);
@@ -358,15 +356,15 @@ class RigidBody extends Trait {
 		body.applyImpulse(v1, v2);
 	}
 
-	public function applyTorque(torque:Vec4) {
+	public function applyTorque(torque: Vec4) {
 		activate();
 		v1.init(torque.x, torque.y, torque.z);
 		body.applyTorque(v1);
 	}
 
-	public function applyTorqueImpulse(torque:Vec4) {
+	public function applyTorqueImpulse(torque: Vec4) {
 		// TODO -> low priority
-		trace("TODO: applyTorqueImpulse");
+		trace("TODO:  applyTorqueImpulse");
 	}
 
 	/**
@@ -376,8 +374,8 @@ class RigidBody extends Trait {
 	 * @param y
 	 * @param z
 	 */
-	public function setLinearFactor(x:Float, y:Float, z:Float) {
-		var massData:MassData = body.getMassData();
+	public function setLinearFactor(x: Float, y: Float, z: Float) {
+		var massData: MassData = body.getMassData();
 		massData.localInertia = new Mat3(x, 0, 0, 0, y, 0, 0, 0, z); // Using local inertia as alternative, see https://github.com/saharan/OimoPhysics/issues/73
 		body.setMassData(massData);
 		this.linearFactor = new Vec3(x, y, z);
@@ -390,57 +388,57 @@ class RigidBody extends Trait {
 	 * @param y
 	 * @param z
 	 */
-	public function setAngularFactor(x:Float, y:Float, z:Float) {
+	public function setAngularFactor(x: Float, y: Float, z: Float) {
 		v1.init(x, y, z);
 		body.setRotationFactor(v1);
 		this.angularFactor = new Vec3(x, y, z);
 	}
 
-	public function getLinearVelocity():Vec4 {
+	public function getLinearVelocity(): Vec4 {
 		var v = body.getLinearVelocity();
 		return new Vec4(v.x, v.y, v.z);
 	}
 
-	public function setLinearVelocity(x:Float, y:Float, z:Float) {
+	public function setLinearVelocity(x: Float, y: Float, z: Float) {
 		v1.init(x, y, z);
 		body.setLinearVelocity(v1);
 	}
 
-	public function getAngularVelocity():Vec4 {
-		var v:Vec3 = body.getAngularVelocity();
+	public function getAngularVelocity(): Vec4 {
+		var v: Vec3 = body.getAngularVelocity();
 		return new Vec4(v.x, v.y, v.z);
 	}
 
-	public function setAngularVelocity(x:Float, y:Float, z:Float) {
+	public function setAngularVelocity(x: Float, y: Float, z: Float) {
 		v1.init(x, y, z);
 		body.setAngularVelocity(v1);
 	}
 
-	public function getPointVelocity(x:Float, y:Float, z:Float):Vec4 {
-		var linear:Vec4 = getLinearVelocity();
+	public function getPointVelocity(x: Float, y: Float, z: Float): Vec4 {
+		var linear: Vec4 = getLinearVelocity();
 
-		var relativePoint:Vec4 = new Vec4(x, y, z).sub(transform.world.getLoc());
-		var angular:Vec4 = getAngularVelocity().cross(relativePoint);
+		var relativePoint: Vec4 = new Vec4(x, y, z).sub(transform.world.getLoc());
+		var angular: Vec4 = getAngularVelocity().cross(relativePoint);
 
 		return linear.add(angular);
 	}
 
-	public function setFriction(f:Float) {
-		var bodyShape:oimo.dynamics.rigidbody.Shape = body.getShapeList();
+	public function setFriction(f: Float) {
+		var bodyShape: oimo.dynamics.rigidbody.Shape = body.getShapeList();
 		bodyShape.setFriction(f);
 		this.friction = f;
 	}
 
-	public function notifyOnContact(f:RigidBody->Void) {
+	public function notifyOnContact(f: RigidBody->Void) {
 		if (onContact == null) onContact = [];
 		onContact.push(f);
 	}
 
-	public function removeContact(f:RigidBody->Void) {
+	public function removeContact(f: RigidBody->Void) {
 		onContact.remove(f);
 	}
 
-	public function setScale(v:Vec4) {
+	public function setScale(v: Vec4) {
 		// TODO -> low priority
 		trace("TODO setScale");
 	}
@@ -465,9 +463,9 @@ class RigidBody extends Trait {
 		activate();
 	}
 
-	public function setCcd(sphereRadius:Float, motionThreshold:Float = 1e-7) {
+	public function setCcd(sphereRadius: Float, motionThreshold: Float = 1e-7) {
 		// TODO, see https://github.com/saharan/OimoPhysics/issues/9#issuecomment-363788349
-		trace("TODO setCcd, see: https://github.com/saharan/OimoPhysics/issues/9#issuecomment-363788349");
+		trace("TODO setCcd, see:  https://github.com/saharan/OimoPhysics/issues/9#issuecomment-363788349");
 	}
 
 	public function delete() {
