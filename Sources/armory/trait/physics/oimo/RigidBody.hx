@@ -70,7 +70,6 @@ class RigidBody extends Trait {
 	static var q1: Quat = new Quat();
 
 	// Interpolation
-	var interpolate: Bool = false;
 	var lastTime: Float = 0.0;
 	var time: Float = 0.0;
 	var currentPos: Vec3 = new Vec3();
@@ -256,6 +255,7 @@ class RigidBody extends Trait {
 		currentShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
 	}
 
+	// FIXME: interpolation has some jittering
 	function update() {
 		var now = Time.realTime();
 		var delta = now - lastTime;
@@ -290,6 +290,7 @@ class RigidBody extends Trait {
 		}
 	}
 
+	// FIXME: interpolation has some jittering
 	function physicsUpdate() {
 		if (!ready) return;
 
