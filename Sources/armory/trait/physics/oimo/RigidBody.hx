@@ -1,6 +1,7 @@
 package armory.trait.physics.oimo;
 
 #if arm_oimo
+import armory.math.Helper;
 import armory.trait.physics.PhysicsWorld;
 
 import iron.Trait;
@@ -8,6 +9,7 @@ import iron.data.MeshData;
 import iron.math.Vec4;
 import iron.object.Transform;
 import iron.object.MeshObject;
+import iron.system.Time;
 
 import oimo.collision.geometry.*;
 import oimo.common.Mat3;
@@ -66,6 +68,15 @@ class RigidBody extends Trait {
 	static var v1: Vec3 = new Vec3();
 	static var v2: Vec3 = new Vec3();
 	static var q1: Quat = new Quat();
+
+	// Interpolation
+	var interpolate: Bool = false;
+	var lastTime: Float = 0.0;
+	var time: Float = 0.0;
+	var currentPos: Vec3 = new Vec3();
+	var prevPos: Vec3 = new Vec3();
+	var currentRot: Quat = new Quat();
+	var prevRot: Quat = new Quat();
 
 	public function new(shape: Shape = Shape.Box, mass: Float = 1.0, friction: Float = 0.5, restitution: Float = 0.0, group: Int = 1, mask: Int = 1,
 						params: RigidBodyParams = null, flags: RigidBodyFlags = null) {
@@ -164,6 +175,9 @@ class RigidBody extends Trait {
 		body.userData = this;
 		// body.setIsTrigger(trigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
 
+		currentPos.copyFrom(body.getPosition());
+		currentRot.copyFrom(body.getOrientation());
+
 		var massData: MassData = new MassData();
 		massData.mass = mass;
 		massData.localInertia = new Mat3(angularFriction, 0, 0, 0, angularFriction, 0, 0, 0, angularFriction); // This applies rotation inertia instead of friction. Do not use '0' as a value.
@@ -173,6 +187,7 @@ class RigidBody extends Trait {
 
 		physics.addRigidBody(this);
 		notifyOnRemove(removeFromWorld);
+		notifyOnLateUpdate(lateUpdate);
 
 		if (onReady != null) onReady();
 	}
@@ -241,23 +256,52 @@ class RigidBody extends Trait {
 		currentShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
 	}
 
-	function physicsUpdate() {
-		if (!ready) return;
-		if (object.animation != null || animated) {
-			syncTransform();
-		} else {
-			var p: Vec3 = body.getPosition();
-			var q: Quat = body.getOrientation();
-			transform.loc.set(p.x, p.y, p.z);
-			transform.rot.set(q.x, q.y, q.z, q.w);
+	function lateUpdate() {
+		var now = Time.realTime();
+		var delta = now - lastTime;
+		lastTime = now;
+		time += delta;
+
+		while (time >= Time.fixedStep) {
+			time -= Time.fixedStep;
+		}
+
+		var t: Float = time / Time.fixedStep;
+		t = Helper.clamp(t, 0, 1);
+
+		var tx: Float = prevPos.x * (1.0 - t) + currentPos.x * t;
+		var ty: Float = prevPos.y * (1.0 - t) + currentPos.y * t;
+		var tz: Float = prevPos.z * (1.0 - t) + currentPos.z * t;
+
+		var tRot: Quat = prevRot.slerp(currentRot, t);
+
+		if (object.animation == null && !animated) {
+			transform.loc.set(tx, ty, tz, 1.0);
+			transform.rot.set(tRot.x, tRot.y, tRot.z, tRot.w);
+
 			if (object.parent != null) {
 				var ptransform = object.parent.transform;
 				transform.loc.x -= ptransform.worldx();
 				transform.loc.y -= ptransform.worldy();
 				transform.loc.z -= ptransform.worldz();
 			}
+
 			transform.buildMatrix();
 		}
+	}
+
+	function physicsUpdate() {
+		if (!ready) return;
+
+		prevPos.copyFrom(currentPos);
+		prevRot.copyFrom(currentRot);
+
+		if (object.animation != null || animated) {
+			syncTransform();
+		}
+
+		currentPos.copyFrom(body.getPosition());
+		currentRot.copyFrom(body.getOrientation());
 
 		if (onContact != null) {
 			var rbs: Array<RigidBody> = physics.getContacts(this);
