@@ -64,7 +64,6 @@ class PhysicsWorld extends Trait {
 
 	var debugDrawHelper: DebugDrawHelper = null;
 
-	// Arguments `timeScale`, `maxSteps` and `solverIterations` are not used. They have been added to be able to use `debugDrawMode`.
 	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, debugDrawMode: DebugDrawMode = NoDebug) {
 		super();
 
