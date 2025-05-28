@@ -132,7 +132,10 @@ class RigidBody extends Trait {
 		this.staticObj = flags.staticObj;
 		this.useDeactivation = flags.useDeactivation;
 
+		this.lastTime = Time.realTime();
+
 		notifyOnAdd(init);
+		notifyOnLateUpdate(lateUpdate);
 	}
 
 	inline function withMargin(f: Float) {
@@ -187,7 +190,6 @@ class RigidBody extends Trait {
 
 		physics.addRigidBody(this);
 		notifyOnRemove(removeFromWorld);
-		notifyOnLateUpdate(lateUpdate);
 
 		if (onReady != null) onReady();
 	}
