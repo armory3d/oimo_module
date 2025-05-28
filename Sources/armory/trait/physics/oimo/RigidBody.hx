@@ -135,7 +135,7 @@ class RigidBody extends Trait {
 		this.lastTime = Time.realTime();
 
 		notifyOnAdd(init);
-		notifyOnLateUpdate(lateUpdate);
+		notifyOnUpdate(update);
 	}
 
 	inline function withMargin(f: Float) {
@@ -258,7 +258,7 @@ class RigidBody extends Trait {
 		currentShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
 	}
 
-	function lateUpdate() {
+	function update() {
 		var now = Time.realTime();
 		var delta = now - lastTime;
 		lastTime = now;
