@@ -54,6 +54,7 @@ class PhysicsWorld extends Trait {
 	public static var active: PhysicsWorld = null;
 	public var world: oimo.dynamics.World;
 	public var rbMap: Map<Int, RigidBody>;
+	public var timeScale: Float = 1.0;
 	var preUpdates: Array<Void->Void> = null;
 	public var hitPointWorld = new Vec4();
 	public var hitNormalWorld = new Vec4();
@@ -66,6 +67,8 @@ class PhysicsWorld extends Trait {
 	// Arguments `timeScale`, `maxSteps` and `solverIterations` are not used. They have been added to be able to use `debugDrawMode`.
 	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, debugDrawMode: DebugDrawMode = NoDebug) {
 		super();
+
+		this.timeScale = timeScale;
 
 		if (active == null) {
 			createPhysics();
@@ -154,7 +157,7 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function fixedUpdate() {
-		var ts: Float = Time.scale;
+		var ts: Float = Time.scale * timeScale;
 		if (ts == 0.0) return;
 
 		#if arm_debug
