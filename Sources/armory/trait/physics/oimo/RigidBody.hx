@@ -132,8 +132,6 @@ class RigidBody extends Trait {
 		this.staticObj = flags.staticObj;
 		this.useDeactivation = flags.useDeactivation;
 
-		this.lastTime = Time.realTime();
-
 		notifyOnAdd(init);
 		notifyOnUpdate(update);
 	}
