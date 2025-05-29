@@ -71,7 +71,6 @@ class RigidBody extends Trait {
 
 	// Interpolation
 	var interpolate: Bool = false;
-	var lastTime: Float = 0.0;
 	var time: Float = 0.0;
 	var currentPos: Vec3 = new Vec3();
 	var prevPos: Vec3 = new Vec3();
@@ -258,13 +257,10 @@ class RigidBody extends Trait {
 		currentShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
 	}
 
-	// FIXME: interpolation has some jittering
+	// FIXME: rotation has some jittering
 	function update() {
 		if (interpolate) {
-			var now = Time.realTime();
-			var delta = now - lastTime;
-			lastTime = now;
-			time += delta;
+			time += Time.delta;
 
 			while (time >= Time.fixedStep) {
 				time -= Time.fixedStep;
@@ -296,7 +292,6 @@ class RigidBody extends Trait {
 		transform.buildMatrix();
 	}
 
-	// FIXME: interpolation has some jittering
 	function physicsUpdate() {
 		if (!ready) return;
 
