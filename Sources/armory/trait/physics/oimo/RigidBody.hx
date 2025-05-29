@@ -294,14 +294,12 @@ class RigidBody extends Trait {
 
 	function nlerp(q1: Quat, q2: Quat, t: Float): Quat {
 		var dot = q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w;
-		var q2_ = dot < 0 ? new Quat(
-			-q2.x, -q2.y, -q2.z, -q2.w
-		) : q2;
+		var _q2 = dot < 0 ? new Quat(-q2.x, -q2.y, -q2.z, -q2.w) : q2;
 
-		var x = q1.x * (1.0 - t) + q2_.x * t;
-		var y = q1.y * (1.0 - t) + q2_.y * t;
-		var z = q1.z * (1.0 - t) + q2_.z * t;
-		var w = q1.w * (1.0 - t) + q2_.w * t;
+		var x = q1.x * (1.0 - t) + _q2.x * t;
+		var y = q1.y * (1.0 - t) + _q2.y * t;
+		var z = q1.z * (1.0 - t) + _q2.z * t;
+		var w = q1.w * (1.0 - t) + _q2.w * t;
 
 		var len = Math.sqrt(x * x + y * y + z * z + w * w);
 		return new Quat(x / len, y / len, z / len, w / len);
