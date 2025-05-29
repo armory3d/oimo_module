@@ -64,10 +64,11 @@ class PhysicsWorld extends Trait {
 
 	var debugDrawHelper: DebugDrawHelper = null;
 
-	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, debugDrawMode: DebugDrawMode = NoDebug) {
+	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, fixedStep = 1 / 60, debugDrawMode: DebugDrawMode = NoDebug) {
 		super();
 
 		this.timeScale = timeScale;
+		Time.initFixedStep(fixedStep);
 
 		if (active == null) {
 			createPhysics();
