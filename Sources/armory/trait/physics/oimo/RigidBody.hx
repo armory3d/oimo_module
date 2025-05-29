@@ -273,7 +273,7 @@ class RigidBody extends Trait {
 			var ty: Float = prevPos.y * (1.0 - t) + currentPos.y * t;
 			var tz: Float = prevPos.z * (1.0 - t) + currentPos.z * t;
 
-			var tRot: Quat = prevRot.slerp(currentRot, t);
+			var tRot: Quat = nlerp(prevRot, currentRot, t);
 
 			transform.loc.set(tx, ty, tz, 1.0);
 			transform.rot.set(tRot.x, tRot.y, tRot.z, tRot.w);
@@ -290,6 +290,21 @@ class RigidBody extends Trait {
 		}
 
 		transform.buildMatrix();
+	}
+
+	function nlerp(q1: Quat, q2: Quat, t: Float): Quat {
+		var dot = q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w;
+		var q2_ = dot < 0 ? new Quat(
+			-q2.x, -q2.y, -q2.z, -q2.w
+		) : q2;
+
+		var x = q1.x * (1.0 - t) + q2_.x * t;
+		var y = q1.y * (1.0 - t) + q2_.y * t;
+		var z = q1.z * (1.0 - t) + q2_.z * t;
+		var w = q1.w * (1.0 - t) + q2_.w * t;
+
+		var len = Math.sqrt(x * x + y * y + z * z + w * w);
+		return new Quat(x / len, y / len, z / len, w / len);
 	}
 
 	function physicsUpdate() {
