@@ -257,7 +257,6 @@ class RigidBody extends Trait {
 		currentShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
 	}
 
-	// FIXME: rotation has some jittering
 	function update() {
 		if (interpolate) {
 			time += Time.delta;
