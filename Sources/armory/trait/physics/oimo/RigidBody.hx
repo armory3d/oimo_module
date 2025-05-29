@@ -70,6 +70,7 @@ class RigidBody extends Trait {
 	static var q1: Quat = new Quat();
 
 	// Interpolation
+	var interpolate: Bool = false;
 	var lastTime: Float = 0.0;
 	var time: Float = 0.0;
 	var currentPos: Vec3 = new Vec3();
@@ -109,6 +110,7 @@ class RigidBody extends Trait {
 			animated: false,
 			trigger: false,
 			ccd: false,
+			interpolate: false,
 			staticObj: false,
 			useDeactivation: true
 		};
@@ -128,11 +130,11 @@ class RigidBody extends Trait {
 		this.animated = flags.animated;
 		this.trigger = flags.trigger;
 		this.ccd = flags.ccd;
+		this.interpolate = flags.interpolate;
 		this.staticObj = flags.staticObj;
 		this.useDeactivation = flags.useDeactivation;
 
 		notifyOnAdd(init);
-		notifyOnUpdate(update);
 	}
 
 	inline function withMargin(f: Float) {
@@ -187,6 +189,7 @@ class RigidBody extends Trait {
 
 		physics.addRigidBody(this);
 		notifyOnRemove(removeFromWorld);
+		if (object.animation == null && !animated) notifyOnUpdate(update);
 
 		if (onReady != null) onReady();
 	}
@@ -257,52 +260,56 @@ class RigidBody extends Trait {
 
 	// FIXME: interpolation has some jittering
 	function update() {
-		var now = Time.realTime();
-		var delta = now - lastTime;
-		lastTime = now;
-		time += delta;
+		if (interpolate) {
+			var now = Time.realTime();
+			var delta = now - lastTime;
+			lastTime = now;
+			time += delta;
 
-		while (time >= Time.fixedStep) {
-			time -= Time.fixedStep;
-		}
-
-		var t: Float = time / Time.fixedStep;
-		t = Helper.clamp(t, 0, 1);
-
-		var tx: Float = prevPos.x * (1.0 - t) + currentPos.x * t;
-		var ty: Float = prevPos.y * (1.0 - t) + currentPos.y * t;
-		var tz: Float = prevPos.z * (1.0 - t) + currentPos.z * t;
-
-		var tRot: Quat = prevRot.slerp(currentRot, t);
-
-		if (object.animation == null && !animated) {
-			transform.loc.set(tx, ty, tz, 1.0);
-			transform.rot.set(tRot.x, tRot.y, tRot.z, tRot.w);
-
-			if (object.parent != null) {
-				var ptransform = object.parent.transform;
-				transform.loc.x -= ptransform.worldx();
-				transform.loc.y -= ptransform.worldy();
-				transform.loc.z -= ptransform.worldz();
+			while (time >= Time.fixedStep) {
+				time -= Time.fixedStep;
 			}
 
-			transform.buildMatrix();
+			var t: Float = time / Time.fixedStep;
+			t = Helper.clamp(t, 0, 1);
+
+			var tx: Float = prevPos.x * (1.0 - t) + currentPos.x * t;
+			var ty: Float = prevPos.y * (1.0 - t) + currentPos.y * t;
+			var tz: Float = prevPos.z * (1.0 - t) + currentPos.z * t;
+
+			var tRot: Quat = prevRot.slerp(currentRot, t);
+
+			transform.loc.set(tx, ty, tz, 1.0);
+			transform.rot.set(tRot.x, tRot.y, tRot.z, tRot.w);
+		} else {
+			transform.loc.set(currentPos.x, currentPos.y, currentPos.z, 1.0);
+			transform.rot.set(currentRot.x, currentRot.y, currentRot.z, currentRot.w);
 		}
+
+		if (object.parent != null) {
+			var ptransform = object.parent.transform;
+			transform.loc.x -= ptransform.worldx();
+			transform.loc.y -= ptransform.worldy();
+			transform.loc.z -= ptransform.worldz();
+		}
+
+		transform.buildMatrix();
 	}
 
 	// FIXME: interpolation has some jittering
 	function physicsUpdate() {
 		if (!ready) return;
 
-		prevPos.copyFrom(currentPos);
-		prevRot.copyFrom(currentRot);
-
 		if (object.animation != null || animated) {
 			syncTransform();
+		} else {
+			if (interpolate) {
+				prevPos.copyFrom(currentPos);
+				prevRot.copyFrom(currentRot);
+			}
+			currentPos.copyFrom(body.getPosition());
+			currentRot.copyFrom(body.getOrientation());
 		}
-
-		currentPos.copyFrom(body.getPosition());
-		currentRot.copyFrom(body.getOrientation());
 
 		if (onContact != null) {
 			var rbs: Array<RigidBody> = physics.getContacts(this);
@@ -560,6 +567,7 @@ typedef RigidBodyFlags = {
 	var animated: Bool;
 	var trigger: Bool;
 	var ccd: Bool;
+	var interpolate: Bool;
 	var staticObj: Bool;
 	var useDeactivation: Bool;
 }
