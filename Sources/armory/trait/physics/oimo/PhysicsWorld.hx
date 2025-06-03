@@ -60,7 +60,6 @@ class PhysicsWorld extends Trait {
 	public var hitNormalWorld = new Vec4();
 	public var rayCastResult: RayCastClosestWithMask;
 	var contacts: Array<ContactPair>;
-	public var pause: Bool = false;
 
 	var debugDrawHelper: DebugDrawHelper = null;
 
@@ -166,11 +165,9 @@ class PhysicsWorld extends Trait {
 
 		if (preUpdates != null) for (f in preUpdates) f();
 
-		if (!pause) {
-			world.step(Time.fixedStep * ts);
-			updateContacts();
-			for (rb in rbMap) { @:privateAccess try { rb.physicsUpdate(); } catch(e:haxe.Exception) { trace(e.message); } } // HACK: see this recommendation: https://github.com/armory3d/armory/issues/3044#issuecomment-2558199944.
-		}
+		world.step(Time.fixedStep * ts);
+		updateContacts();
+		for (rb in rbMap) { @:privateAccess try { rb.physicsUpdate(); } catch(e:haxe.Exception) { trace(e.message); } } // HACK: see this recommendation: https://github.com/armory3d/armory/issues/3044#issuecomment-2558199944.
 
 		#if arm_debug
 		physTime = kha.Scheduler.realTime() - startTime;
