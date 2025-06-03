@@ -215,7 +215,7 @@ class PhysicsWorld extends Trait {
 		world.rayCast(new Vec3(from.x, from.y, from.z), new Vec3(to.x, to.y, to.z), rayCastResult);
 
 		if (rayCastResult.hit) {
-			var rb: RigidBody = cast (rayCastResult.shape._rigidBody.userData, RigidBody);
+			var rb: RigidBody = cast(rayCastResult.shape._rigidBody.userData, RigidBody);
 			hitPointWorld.set(rayCastResult.position.x, rayCastResult.position.y, rayCastResult.position.z);
 			hitNormalWorld.set(rayCastResult.normal.x, rayCastResult.normal.y, rayCastResult.normal.z);
 			hitInfo = new Hit(rb, hitPointWorld, hitNormalWorld);
@@ -225,8 +225,8 @@ class PhysicsWorld extends Trait {
 			from: from,
 			to: to,
 			hasHit: rayCastResult.hit,
-			hitPoint: hitPointWorld,
-			hitNormal: hitNormalWorld
+			hitPoint: hitPointWorld.clone(),
+			hitNormal: hitNormalWorld.clone()
 		});
 
 		return hitInfo;
