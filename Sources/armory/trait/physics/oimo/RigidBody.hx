@@ -174,7 +174,7 @@ class RigidBody extends Trait {
 		body.setRotationFactor(angularFactor);
 		body.addShape(currentShape);
 		body.userData = this;
-		// body.setIsTrigger(trigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
+		// currentShape.setIsTrigger(trigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
 
 		currentPos.copyFrom(body.getPosition());
 		currentRot.copyFrom(body.getOrientation());
@@ -395,7 +395,7 @@ class RigidBody extends Trait {
 
 	public function isTriggerObject(isTrigger: Bool) {
 		this.trigger = isTrigger;
-		// body.setIsTrigger(isTrigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
+		// currentShape.setIsTrigger(isTrigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
 		// Not implemented in the official Oimo repo yet. See: https://github.com/saharan/OimoPhysics/issues/45
 	}
 
