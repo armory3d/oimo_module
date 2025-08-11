@@ -543,8 +543,8 @@ class RigidBody extends Trait {
 	var Capsule = 6;
 	var Cylinder = 5;
 	var Cone = 4;
-	var ConvexHull = 3;
-	var Mesh = 2;
+	var ConvexHull = 2;
+	var Mesh = 3;
 	var Terrain = 7;
 }
 
