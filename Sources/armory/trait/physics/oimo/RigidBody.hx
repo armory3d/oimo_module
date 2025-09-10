@@ -207,7 +207,7 @@ class RigidBody extends Trait {
 				withMargin(transform.dim.x) * 0.5
 			);
 		}
-		else if (shape == Shape.ConvexHull || shape == Shape.Mesh) {
+		else if (shape == Shape.ConvexHull) {
 			var md: MeshData = cast(object, MeshObject).data;
 			var positions: kha.arrays.Int16Array = md.geom.positions.values;
 			var sx: Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
@@ -224,6 +224,35 @@ class RigidBody extends Trait {
 
 			shapeConfig.geometry = new ConvexHullGeometry(
 				verts
+			);
+		}
+		else if (shape == Shape.Mesh) {
+			var md: MeshData = cast(object, MeshObject).data;
+			var positions: kha.arrays.Int16Array = md.geom.positions.values;
+			var indices: kha.arrays.Uint32Array = md.geom.indices[0];
+			var sx: Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sy: Float = transform.scale.y * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sz: Float = transform.scale.z * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+
+			// Extract vertices
+			var verts: Array<Vec3> = [];
+			for (i in 0...Std.int(positions.length / 4)) {
+				verts.push(new Vec3(
+					positions[i * 4    ] * sx,
+					positions[i * 4 + 1] * sy,
+					positions[i * 4 + 2] * sz
+				));
+			}
+
+			// Extract triangle indices
+			var triangleIndices: Array<Int> = [];
+			for (i in 0...indices.length) {
+				triangleIndices.push(indices[i]);
+			}
+
+			shapeConfig.geometry = new StaticMeshGeometry(
+				verts,
+				triangleIndices
 			);
 		}
 		else if (shape == Shape.Cone) {
