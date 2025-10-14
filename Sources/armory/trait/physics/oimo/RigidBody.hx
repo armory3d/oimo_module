@@ -553,11 +553,13 @@ class RigidBody extends Trait {
 	}
 
 	public function setGroup(group: Int) {
+		if (this.group == group) return;
 		this.group = group;
 		bodyShape.setCollisionGroup(group);
 	}
 
 	public function setMask(mask: Int) {
+		if (this.mask == mask) return;
 		this.mask = mask;
 		bodyShape.setCollisionMask(mask);
 	}
