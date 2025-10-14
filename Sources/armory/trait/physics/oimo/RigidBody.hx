@@ -153,7 +153,7 @@ class RigidBody extends Trait {
 		transform.buildMatrix();
 		physics = PhysicsWorld.active;
 
-		setShape(transform);
+		setShape();
 
 		var bodyConfig: RigidBodyConfig = new RigidBodyConfig();
 		bodyConfig.type = animated ? RigidBodyType.KINEMATIC : !staticObj ? RigidBodyType.DYNAMIC : RigidBodyType.STATIC;
@@ -193,7 +193,7 @@ class RigidBody extends Trait {
 		if (onReady != null) onReady();
 	}
 
-	function setShape(transform: Transform) {
+	function setShape() {
 		var shapeConfig: ShapeConfig = new ShapeConfig();
 
 		if (shapeGeometry == Shape.Box) {
@@ -537,7 +537,7 @@ class RigidBody extends Trait {
 		// BUG: removing and adding a new shape is not raycast friendly
 		if (object.animation != null || animated) {
 			var previousShape:oimo.dynamics.rigidbody.Shape = body.getShapeList();
-			setShape(transform);
+			setShape();
 
 			if (previousShape._geom._volume != bodyShape._geom._volume) {
 				body.removeShape(previousShape);
@@ -550,6 +550,16 @@ class RigidBody extends Trait {
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
 		activate();
+	}
+
+	public function setGroup(group: Int) {
+		this.group = group;
+		currentShape.setCollisionGroup(group);
+	}
+
+	public function setMask(mask: Int) {
+		this.mask = mask;
+		currentShape.setCollisionMask(mask);
 	}
 
 	public function setCcd(sphereRadius: Float, motionThreshold: Float = 1e-7) {
