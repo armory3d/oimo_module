@@ -554,12 +554,12 @@ class RigidBody extends Trait {
 
 	public function setGroup(group: Int) {
 		this.group = group;
-		currentShape.setCollisionGroup(group);
+		bodyShape.setCollisionGroup(group);
 	}
 
 	public function setMask(mask: Int) {
 		this.mask = mask;
-		currentShape.setCollisionMask(mask);
+		bodyShape.setCollisionMask(mask);
 	}
 
 	public function setCcd(sphereRadius: Float, motionThreshold: Float = 1e-7) {
