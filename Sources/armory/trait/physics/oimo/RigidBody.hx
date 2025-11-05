@@ -174,7 +174,6 @@ class RigidBody extends Trait {
 		body.setRotationFactor(angularFactor);
 		body.addShape(bodyShape);
 		body.userData = this;
-		bodyShape.setIsTrigger(trigger);
 
 		currentPos.copyFrom(body.getPosition());
 		currentRot.copyFrom(body.getOrientation());
@@ -285,6 +284,7 @@ class RigidBody extends Trait {
 		shapeConfig.collisionMask = mask;
 
 		bodyShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
+		bodyShape.setIsTrigger(trigger);
 	}
 
 	function update() {
@@ -536,7 +536,7 @@ class RigidBody extends Trait {
 		// HACK: Applies scale on animated objects only. This is for animated objects that change their scale over time
 		// BUG: removing and adding a new shape is not raycast friendly
 		if (object.animation != null || animated) {
-			var previousShape:oimo.dynamics.rigidbody.Shape = body.getShapeList();
+			var previousShape: oimo.dynamics.rigidbody.Shape = body.getShapeList();
 			setShape();
 
 			if (previousShape._geom._volume != bodyShape._geom._volume) {
