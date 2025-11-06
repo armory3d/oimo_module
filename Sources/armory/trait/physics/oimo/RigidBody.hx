@@ -21,8 +21,8 @@ import oimo.dynamics.rigidbody.RigidBodyType;
 import oimo.dynamics.rigidbody.ShapeConfig;
 
 class RigidBody extends Trait {
-	var shape: Shape;
-	var currentShape: oimo.dynamics.rigidbody.Shape;
+	var shapeGeometry: Shape;
+	var bodyShape: oimo.dynamics.rigidbody.Shape;
 
 	public var physics: PhysicsWorld;
 	public var transform: Transform = null;
@@ -77,11 +77,11 @@ class RigidBody extends Trait {
 	var currentRot: Quat = new Quat();
 	var prevRot: Quat = new Quat();
 
-	public function new(shape: Shape = Shape.Box, mass: Float = 1.0, friction: Float = 0.5, restitution: Float = 0.0, group: Int = 1, mask: Int = 1,
+	public function new(shapeGeometry: Shape = Shape.Box, mass: Float = 1.0, friction: Float = 0.5, restitution: Float = 0.0, group: Int = 1, mask: Int = 1,
 						params: RigidBodyParams = null, flags: RigidBodyFlags = null) {
 		super();
 
-		this.shape = shape;
+		this.shapeGeometry = shapeGeometry;
 		this.mass = mass;
 		this.friction = friction;
 		this.restitution = restitution;
@@ -153,7 +153,7 @@ class RigidBody extends Trait {
 		transform.buildMatrix();
 		physics = PhysicsWorld.active;
 
-		setShape(transform);
+		setShape();
 
 		var bodyConfig: RigidBodyConfig = new RigidBodyConfig();
 		bodyConfig.type = animated ? RigidBodyType.KINEMATIC : !staticObj ? RigidBodyType.DYNAMIC : RigidBodyType.STATIC;
@@ -172,9 +172,8 @@ class RigidBody extends Trait {
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
 		body.setRotationFactor(angularFactor);
-		body.addShape(currentShape);
+		body.addShape(bodyShape);
 		body.userData = this;
-		// body.setIsTrigger(trigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
 
 		currentPos.copyFrom(body.getPosition());
 		currentRot.copyFrom(body.getOrientation());
@@ -193,21 +192,21 @@ class RigidBody extends Trait {
 		if (onReady != null) onReady();
 	}
 
-	function setShape(transform: Transform) {
+	function setShape() {
 		var shapeConfig: ShapeConfig = new ShapeConfig();
 
-		if (shape == Shape.Box) {
+		if (shapeGeometry == Shape.Box) {
 			v1.init(withMargin(transform.dim.x) * 0.5, withMargin(transform.dim.y) * 0.5, withMargin(transform.dim.z) * 0.5);
 			shapeConfig.geometry = new BoxGeometry(
 				v1
 			);
 		}
-		else if (shape == Shape.Sphere) {
+		else if (shapeGeometry == Shape.Sphere) {
 			shapeConfig.geometry = new SphereGeometry(
 				withMargin(transform.dim.x) * 0.5
 			);
 		}
-		else if (shape == Shape.ConvexHull || shape == Shape.Mesh) {
+		else if (shapeGeometry == Shape.ConvexHull) {
 			var md: MeshData = cast(object, MeshObject).data;
 			var positions: kha.arrays.Int16Array = md.geom.positions.values;
 			var sx: Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
@@ -226,21 +225,51 @@ class RigidBody extends Trait {
 				verts
 			);
 		}
-		else if (shape == Shape.Cone) {
+		else if (shapeGeometry == Shape.Mesh) {
+			var md: MeshData = cast(object, MeshObject).data;
+			var positions: kha.arrays.Int16Array = md.geom.positions.values;
+			var sx: Float = transform.scale.x * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sy: Float = transform.scale.y * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+			var sz: Float = transform.scale.z * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
+
+			// Extract vertices
+			var verts: Array<Vec3> = [];
+			for (i in 0...Std.int(positions.length / 4)) {
+				verts.push(new Vec3(
+					positions[i * 4    ] * sx,
+					positions[i * 4 + 1] * sy,
+					positions[i * 4 + 2] * sz
+				));
+			}
+
+			// Extract triangle indices from ALL index buffers
+			var triangleIndices: Array<Int> = [];
+			for (indexBuffer in md.geom.indices) {
+				for (i in 0...indexBuffer.length) {
+					triangleIndices.push(indexBuffer[i]);
+				}
+			}
+
+			shapeConfig.geometry = new StaticMeshGeometry(
+				verts,
+				triangleIndices
+			);
+		}
+		else if (shapeGeometry == Shape.Cone) {
 			shapeConfig.geometry = new ConeGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.z) * 0.5 // Half-height
 			);
 			shapeConfig.rotation = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
 		}
-		else if (shape == Shape.Cylinder) {
+		else if (shapeGeometry == Shape.Cylinder) {
 			shapeConfig.geometry = new CylinderGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.z) * 0.5 // Half-height
 			);
 			shapeConfig.rotation = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
 		}
-		else if (shape == Shape.Capsule) {
+		else if (shapeGeometry == Shape.Capsule) {
 			shapeConfig.geometry = new CapsuleGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
 				withMargin(transform.dim.z) * 0.5 - withMargin(transform.dim.x) * 0.5// Half-height
@@ -254,7 +283,8 @@ class RigidBody extends Trait {
 		shapeConfig.collisionGroup = group;
 		shapeConfig.collisionMask = mask;
 
-		currentShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
+		bodyShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
+		bodyShape.setIsTrigger(trigger);
 	}
 
 	function update() {
@@ -395,7 +425,7 @@ class RigidBody extends Trait {
 
 	public function isTriggerObject(isTrigger: Bool) {
 		this.trigger = isTrigger;
-		// body.setIsTrigger(isTrigger); // Uncomment if this PR is merged: https://github.com/saharan/OimoPhysics/pull/77
+		bodyShape.setIsTrigger(isTrigger);
 		// Not implemented in the official Oimo repo yet. See: https://github.com/saharan/OimoPhysics/issues/45
 	}
 
@@ -506,12 +536,12 @@ class RigidBody extends Trait {
 		// HACK: Applies scale on animated objects only. This is for animated objects that change their scale over time
 		// BUG: removing and adding a new shape is not raycast friendly
 		if (object.animation != null || animated) {
-			var previousShape:oimo.dynamics.rigidbody.Shape = body.getShapeList();
-			setShape(transform);
+			var previousShape: oimo.dynamics.rigidbody.Shape = body.getShapeList();
+			setShape();
 
-			if (previousShape._geom._volume != currentShape._geom._volume) {
+			if (previousShape._geom._volume != bodyShape._geom._volume) {
 				body.removeShape(previousShape);
-				body.addShape(currentShape);
+				body.addShape(bodyShape);
 			}
 		}
 
@@ -520,6 +550,18 @@ class RigidBody extends Trait {
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
 		activate();
+	}
+
+	public function setGroup(group: Int) {
+		if (this.group == group) return;
+		this.group = group;
+		bodyShape.setCollisionGroup(group);
+	}
+
+	public function setMask(mask: Int) {
+		if (this.mask == mask) return;
+		this.mask = mask;
+		bodyShape.setCollisionMask(mask);
 	}
 
 	public function setCcd(sphereRadius: Float, motionThreshold: Float = 1e-7) {
@@ -543,8 +585,8 @@ class RigidBody extends Trait {
 	var Capsule = 6;
 	var Cylinder = 5;
 	var Cone = 4;
-	var ConvexHull = 3;
-	var Mesh = 2;
+	var ConvexHull = 2;
+	var Mesh = 3;
 	var Terrain = 7;
 }
 
