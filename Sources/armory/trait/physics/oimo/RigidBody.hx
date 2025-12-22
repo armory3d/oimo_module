@@ -71,7 +71,6 @@ class RigidBody extends Trait {
 
 	// Interpolation
 	var interpolate: Bool = false;
-	var time: Float = 0.0;
 	var currentPos: Vec3 = new Vec3();
 	var prevPos: Vec3 = new Vec3();
 	var currentRot: Quat = new Quat();
@@ -289,13 +288,7 @@ class RigidBody extends Trait {
 
 	function update() {
 		if (interpolate) {
-			time += Time.delta;
-
-			while (time >= Time.fixedStep) {
-				time -= Time.fixedStep;
-			}
-
-			var t: Float = time / Time.fixedStep;
+			var t: Float = Time.fixedStepInterpolation;
 			t = Helper.clamp(t, 0, 1);
 
 			var tx: Float = prevPos.x * (1.0 - t) + currentPos.x * t;

@@ -73,7 +73,7 @@ class PhysicsWorld extends Trait {
 			createPhysics();
 		}
 		else {
-			for (rb in active.rbMap) removeRigidBody(rb);
+			for (rb in active.rbMap) { @:privateAccess try { removeRigidBody(rb); } catch(e: haxe.Exception) { trace(e.message); } }
 			this.world = active.world;
 		}
 
