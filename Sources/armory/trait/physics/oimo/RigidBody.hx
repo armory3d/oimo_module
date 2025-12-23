@@ -348,14 +348,13 @@ class RigidBody extends Trait {
 	}
 
 	public function disableCollision() {
-		// TODO
-		// Set groups and masks to 0? and save the original values in `_group` and `_mask` variables
-		trace("TODO: disableCollision");
+		bodyShape.setCollisionGroup(0);
+		bodyShape.setCollisionMask(0);
 	}
 
 	public function enableCollision() {
-		// TODO
-		trace("TODO: enableCollision");
+		bodyShape.setCollisionGroup(group);
+		bodyShape.setCollisionMask(mask);
 	}
 
 	public function removeFromWorld() {
