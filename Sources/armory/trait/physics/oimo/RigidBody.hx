@@ -348,13 +348,11 @@ class RigidBody extends Trait {
 	}
 
 	public function disableCollision() {
-		bodyShape.setCollisionGroup(0);
-		bodyShape.setCollisionMask(0);
+		physics.removeRigidBody(this);
 	}
 
 	public function enableCollision() {
-		bodyShape.setCollisionGroup(group);
-		bodyShape.setCollisionMask(mask);
+		physics.addRigidBody(this);
 	}
 
 	public function removeFromWorld() {
