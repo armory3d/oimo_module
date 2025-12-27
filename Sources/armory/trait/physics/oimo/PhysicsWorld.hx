@@ -73,7 +73,7 @@ class PhysicsWorld extends Trait {
 			createPhysics();
 		}
 		else {
-			for (rb in active.rbMap) { @:privateAccess try { removeRigidBody(rb); } catch(e: haxe.Exception) { trace(e.message); } }
+			for (rb in active.rbMap) { @:privateAccess try { active.removeRigidBody(rb); } catch(e: haxe.Exception) { trace(e.message); } }
 			this.world = active.world;
 		}
 
@@ -110,6 +110,7 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function addRigidBody(body: RigidBody) {
+		if (rbMap.exists(body.id)) return;
 		world.addRigidBody(body.body);
 		rbMap.set(body.id, body);
 	}
@@ -120,6 +121,7 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function removeRigidBody(body: RigidBody) {
+		if (!rbMap.exists(body.id)) return;
 		if (world != null) world.removeRigidBody(body.body);
 		rbMap.remove(body.id);
 	}
