@@ -65,6 +65,9 @@ class RigidBody extends Trait {
 	public var onContact: Array<RigidBody->Void> = null;
 	public var heightData: haxe.io.Bytes = null;
 
+	// Compound shape children (baked from exporter)
+	var compoundChildren: Array<CompoundChild> = null;
+
 	static var v1: Vec3 = new Vec3();
 	static var v2: Vec3 = new Vec3();
 	static var q1: Quat = new Quat();
@@ -132,6 +135,9 @@ class RigidBody extends Trait {
 		this.staticObj = flags.staticObj;
 		this.useDeactivation = flags.useDeactivation;
 
+		// Store compound children data if provided
+		this.compoundChildren = params.compoundChildren;
+
 		notifyOnAdd(init);
 	}
 
@@ -171,7 +177,18 @@ class RigidBody extends Trait {
 		q1.init(transform.rot.x, transform.rot.y, transform.rot.z, transform.rot.w);
 		body.setOrientation(q1);
 		body.setRotationFactor(angularFactor);
-		body.addShape(bodyShape);
+
+		// For compound shapes, add all child shapes; otherwise add single shape
+		if (shapeGeometry == Shape.Compound && compoundChildren != null) {
+			for (child in compoundChildren) {
+				var childShape = createChildShape(child);
+				if (childShape != null) {
+					body.addShape(childShape);
+				}
+			}
+		} else {
+			body.addShape(bodyShape);
+		}
 		body.userData = this;
 
 		currentPos.copyFrom(body.getPosition());
@@ -275,6 +292,10 @@ class RigidBody extends Trait {
 			);
 			shapeConfig.rotation = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
 		}
+		else if (shapeGeometry == Shape.Compound) {
+			// Compound shapes don't have a parent geometry - child shapes are added in init()
+			return;
+		}
 
 		shapeConfig.friction = friction;
 		shapeConfig.restitution = restitution;
@@ -284,6 +305,92 @@ class RigidBody extends Trait {
 
 		bodyShape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
 		bodyShape.setIsTrigger(trigger);
+	}
+
+	/**
+	 * Creates a child shape for compound rigidbodies from baked export data.
+	 * @param child The compound child data containing shape type, local transform, and dimensions
+	 * @return The created Oimo shape, or null if shape type is unsupported
+	 */
+	function createChildShape(child: CompoundChild): oimo.dynamics.rigidbody.Shape {
+		var shapeConfig: ShapeConfig = new ShapeConfig();
+
+		// Set local position relative to parent
+		shapeConfig.position.init(child.posX, child.posY, child.posZ);
+
+		// Set local rotation from quaternion
+		// Convert quaternion to rotation matrix for Oimo
+		var qx = child.rotX;
+		var qy = child.rotY;
+		var qz = child.rotZ;
+		var qw = child.rotW;
+
+		// Quaternion to rotation matrix conversion
+		var xx = qx * qx;
+		var xy = qx * qy;
+		var xz = qx * qz;
+		var xw = qx * qw;
+		var yy = qy * qy;
+		var yz = qy * qz;
+		var yw = qy * qw;
+		var zz = qz * qz;
+		var zw = qz * qw;
+
+		shapeConfig.rotation = new Mat3(
+			1 - 2 * (yy + zz), 2 * (xy - zw), 2 * (xz + yw),
+			2 * (xy + zw), 1 - 2 * (xx + zz), 2 * (yz - xw),
+			2 * (xz - yw), 2 * (yz + xw), 1 - 2 * (xx + yy)
+		);
+
+		// Create geometry based on shape type
+		var childShape: Int = child.shape;
+		if (childShape == Shape.Box) {
+			v1.init(withMargin(child.dimX) * 0.5, withMargin(child.dimY) * 0.5, withMargin(child.dimZ) * 0.5);
+			shapeConfig.geometry = new BoxGeometry(v1);
+		}
+		else if (childShape == Shape.Sphere) {
+			shapeConfig.geometry = new SphereGeometry(withMargin(child.dimX) * 0.5);
+		}
+		else if (childShape == Shape.Cone) {
+			shapeConfig.geometry = new ConeGeometry(
+				withMargin(child.dimX) * 0.5,
+				withMargin(child.dimZ) * 0.5
+			);
+			// Apply additional rotation for cone alignment (Z-up to Y-up)
+			var coneRot = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
+			shapeConfig.rotation = shapeConfig.rotation.mul(coneRot);
+		}
+		else if (childShape == Shape.Cylinder) {
+			shapeConfig.geometry = new CylinderGeometry(
+				withMargin(child.dimX) * 0.5,
+				withMargin(child.dimZ) * 0.5
+			);
+			var cylRot = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
+			shapeConfig.rotation = shapeConfig.rotation.mul(cylRot);
+		}
+		else if (childShape == Shape.Capsule) {
+			shapeConfig.geometry = new CapsuleGeometry(
+				withMargin(child.dimX) * 0.5,
+				withMargin(child.dimZ) * 0.5 - withMargin(child.dimX) * 0.5
+			);
+			var capsRot = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
+			shapeConfig.rotation = shapeConfig.rotation.mul(capsRot);
+		}
+		else {
+			// Unsupported shape type for compound children (ConvexHull, Mesh, Terrain)
+			trace("Warning: Unsupported compound child shape type: " + childShape);
+			return null;
+		}
+
+		shapeConfig.friction = friction;
+		shapeConfig.restitution = restitution;
+		shapeConfig.density = mass / shapeConfig.geometry._volume;
+		shapeConfig.collisionGroup = group;
+		shapeConfig.collisionMask = mask;
+
+		var shape = new oimo.dynamics.rigidbody.Shape(shapeConfig);
+		shape.setIsTrigger(trigger);
+		return shape;
 	}
 
 	function update() {
@@ -578,6 +685,7 @@ class RigidBody extends Trait {
 	var ConvexHull = 2;
 	var Mesh = 3;
 	var Terrain = 7;
+	var Compound = 8;
 }
 
 @:enum abstract ActivationState(Int) from Int to Int {
@@ -600,6 +708,21 @@ typedef RigidBodyParams = {
 	var linearDeactivationThreshold: Float;
 	var angularDeactivationThreshold: Float;
 	var deactivationTime: Float;
+	@:optional var compoundChildren: Array<CompoundChild>;
+}
+
+typedef CompoundChild = {
+	var shape: Int;      // 0=Box, 1=Sphere, 2=ConvexHull, 3=Mesh, 4=Cone, 5=Cylinder, 6=Capsule
+	var posX: Float;     // Local position relative to parent
+	var posY: Float;
+	var posZ: Float;
+	var rotX: Float;     // Local rotation quaternion
+	var rotY: Float;
+	var rotZ: Float;
+	var rotW: Float;
+	var dimX: Float;     // Dimensions for shape creation
+	var dimY: Float;
+	var dimZ: Float;
 }
 
 typedef RigidBodyFlags = {
