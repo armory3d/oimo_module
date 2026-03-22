@@ -676,7 +676,7 @@ class RigidBody extends Trait {
 	}
 }
 
-@:enum abstract Shape(Int) from Int to Int {
+enum abstract Shape(Int) from Int to Int {
 	var Box = 0;
 	var Sphere = 1;
 	var Capsule = 6;
@@ -688,7 +688,7 @@ class RigidBody extends Trait {
 	var Compound = 8;
 }
 
-@:enum abstract ActivationState(Int) from Int to Int {
+enum abstract ActivationState(Int) from Int to Int {
 	var Active = 1;
 	var NoDeactivation = 4;
 	var NoSimulation = 5;
