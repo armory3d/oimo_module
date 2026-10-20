@@ -5,6 +5,7 @@ import iron.Trait;
 import iron.system.Time;
 import iron.math.Vec4;
 import iron.math.Quat;
+import iron.math.RayCaster;
 
 import oimo.collision.geometry.RayCastHit;
 import oimo.common.Vec3;
@@ -201,10 +202,14 @@ class PhysicsWorld extends Trait {
 		}
 	}
 
-	// TODO
-	public function pickClosest(inputX: Float, inputY: Float, mask: Int = 0xFFFFFFFF): RigidBody {
-		trace("TODO");
-		return null;
+	public function pickClosest(inputX: Float, inputY: Float, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): RigidBody {
+		var camera = iron.Scene.active.camera;
+		var start = new Vec4();
+		var end = new Vec4();
+		RayCaster.getDirection(start, end, inputX, inputY, camera);
+		var hit = rayCast(camera.transform.world.getLoc(), end, group, mask);
+		var rb = (hit != null) ? hit.rb : null;
+		return rb;
 	}
 
 	public function rayCast(from: Vec4, to: Vec4, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): Hit {
