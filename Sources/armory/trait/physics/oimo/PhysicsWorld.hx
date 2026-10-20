@@ -7,19 +7,24 @@ import iron.math.Vec4;
 import iron.math.Quat;
 import iron.math.RayCaster;
 
+import oimo.collision.geometry.ConvexGeometry;
 import oimo.collision.geometry.RayCastHit;
+import oimo.common.Transform;
 import oimo.common.Vec3;
 import oimo.dynamics.callback.RayCastClosest;
 import oimo.dynamics.rigidbody.Shape;
+import oimo.m.M;
 
 class Hit {
-	public var rb: RigidBody;
 	public var pos: Vec4;
 	public var normal: Vec4;
-	public function new(rb: RigidBody, pos: Vec4, normal: Vec4) {
+	public var rb: RigidBody;
+	public var character: KinematicCharacterController;
+	public function new(rb: RigidBody, pos: Vec4, normal: Vec4, character: KinematicCharacterController = null) {
 		this.rb = rb;
 		this.pos = pos;
 		this.normal = normal;
+		this.character = character;
 	}
 }
 
@@ -27,10 +32,14 @@ class ConvexHit {
 	public var pos: Vec4;
 	public var normal: Vec4;
 	public var hitFraction: Float;
-	public function new(pos: Vec4, normal: Vec4, hitFraction: Float){
+	public var rb: RigidBody;
+	public var character: KinematicCharacterController;
+	public function new(pos: Vec4, normal: Vec4, hitFraction: Float, rb: RigidBody = null, character: KinematicCharacterController = null){
+		this.rb = rb;
 		this.pos = pos;
 		this.normal = normal;
 		this.hitFraction = hitFraction;
+		this.character = character;
 	}
 }
 
@@ -60,10 +69,20 @@ class PhysicsWorld extends Trait {
 	var preUpdates: Array<Void->Void> = null;
 	public var hitPointWorld = new Vec4();
 	public var hitNormalWorld = new Vec4();
+	public var convexHitPointWorld = new Vec4();
+	public var convexHitNormalWorld = new Vec4();
 	public var rayCastResult: CastClosestWithMask;
+	public var convexCastResult: CastClosestWithMask;
 	var contacts: Array<ContactPair>;
 
 	var debugDrawHelper: DebugDrawHelper = null;
+
+	// Scratch objects for `convexSweepTest`
+	var sweepTransform: Transform = null;
+	var sweepBodyTransform: Transform = null;
+	var sweepRotation: oimo.common.Quat = null;
+	var sweepTranslation: Vec3 = null;
+	var sweepFrom: Vec3 = null;
 
 	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, fixedStep = 1 / 60, debugDrawMode: DebugDrawMode = NoDebug) {
 		super();
@@ -82,6 +101,7 @@ class PhysicsWorld extends Trait {
 		rbMap = new Map();
 		active = this;
 		rayCastResult = new CastClosestWithMask();
+		convexCastResult = new CastClosestWithMask();
 		contacts = [];
 
 		// Ensure physics are updated first in the fixedUpdate list
@@ -160,6 +180,8 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function fixedUpdate() {
+		if (debugDrawHelper != null) debugDrawHelper.clearCasts();
+
 		var ts: Float = Time.scale * timeScale;
 		if (ts == 0.0) return;
 
@@ -223,10 +245,12 @@ class PhysicsWorld extends Trait {
 		world.rayCast(new Vec3(from.x, from.y, from.z), new Vec3(to.x, to.y, to.z), rayCastResult);
 
 		if (rayCastResult.hit) {
-			var rb: RigidBody = cast(rayCastResult.shape._rigidBody.userData, RigidBody);
+			var ud = rayCastResult.shape._rigidBody.userData;
+			var character: KinematicCharacterController = Std.isOfType(ud, KinematicCharacterController) ? cast ud : null;
+			var rb: RigidBody = (character == null && Std.isOfType(ud, RigidBody)) ? cast ud : null;
 			hitPointWorld.set(rayCastResult.position.x, rayCastResult.position.y, rayCastResult.position.z);
 			hitNormalWorld.set(rayCastResult.normal.x, rayCastResult.normal.y, rayCastResult.normal.z);
-			hitInfo = new Hit(rb, hitPointWorld, hitNormalWorld);
+			hitInfo = new Hit(rb, hitPointWorld, hitNormalWorld, character);
 		}
 
 		if (getDebugDrawMode() & DrawRaycast != 0) debugDrawHelper.rayCast({
@@ -240,10 +264,76 @@ class PhysicsWorld extends Trait {
 		return hitInfo;
 	}
 
-	// TODO
-	public function convexSweepTest(rb: RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int = 0x00000001, mask = 0xFFFFFFFF): ConvexHit {
-		trace("TODO");
-		return null;
+	public function convexSweepTest(rb: RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): ConvexHit {
+		var hitInfo: ConvexHit = null;
+
+		if (rb == null || rb.body == null || world == null) return null;
+
+		var shape = rb.body.getShapeList();
+		if (shape == null) return null;
+
+		// Oimo's convex cast uses a single convex geometry, so use the body's first shape.
+		var geometry = shape.getGeometry();
+		if (!Std.isOfType(geometry, ConvexGeometry)) return null;
+		var convex: ConvexGeometry = cast geometry;
+
+		if (sweepTransform == null) {
+			sweepTransform = new Transform();
+			sweepBodyTransform = new Transform();
+			sweepRotation = new oimo.common.Quat();
+			sweepTranslation = new Vec3();
+			sweepFrom = new Vec3();
+		}
+
+		sweepFrom.init(from.x, from.y, from.z);
+		sweepRotation.init(rotation.x, rotation.y, rotation.z, rotation.w);
+		sweepBodyTransform.setPosition(sweepFrom);
+		sweepBodyTransform.setOrientation(sweepRotation);
+
+		// Oimo's capsule/cylinder/cone geometry is Y-up. Convert to Z-up.
+		M.transform_mul(sweepTransform, shape._localTransform, sweepBodyTransform);
+		sweepTranslation.init(to.x - from.x, to.y - from.y, to.z - from.z);
+
+		convexCastResult.clear();
+		convexCastResult.group = group;
+		convexCastResult.mask = mask;
+
+		world.convexCast(convex, sweepTransform, sweepTranslation, convexCastResult);
+
+		if (convexCastResult.hit) {
+			convexCastResult.normal.negateEq();
+
+			var ud = convexCastResult.shape._rigidBody.userData;
+			var character: KinematicCharacterController = Std.isOfType(ud, KinematicCharacterController) ? cast ud : null;
+			var hitRb: RigidBody = (character == null && Std.isOfType(ud, RigidBody)) ? cast ud : null;
+
+			convexHitPointWorld.set(convexCastResult.position.x, convexCastResult.position.y, convexCastResult.position.z);
+			convexHitNormalWorld.set(convexCastResult.normal.x, convexCastResult.normal.y, convexCastResult.normal.z);
+			hitInfo = new ConvexHit(convexHitPointWorld, convexHitNormalWorld, convexCastResult.fraction, hitRb, character);
+		}
+
+		// Convex casts are shown together with raycasts (DrawRaycast).
+		if (getDebugDrawMode() & DrawRaycast != 0) {
+			var fraction = convexCastResult.hit ? convexCastResult.fraction : 1.0;
+			var startPosition = sweepTransform.getPosition();
+			var endTransform = sweepTransform.clone();
+			endTransform.setPosition(new Vec3(
+				startPosition.x + sweepTranslation.x * fraction,
+				startPosition.y + sweepTranslation.y * fraction,
+				startPosition.z + sweepTranslation.z * fraction
+			));
+
+			debugDrawHelper.convexCast({
+				hasHit: convexCastResult.hit,
+				hitPoint: convexCastResult.hit ? convexHitPointWorld.clone() : null,
+				hitNormal: convexCastResult.hit ? convexHitNormalWorld.clone() : null,
+				geometry: convex,
+				startPosition: startPosition,
+				endTransform: endTransform
+			});
+		}
+
+		return hitInfo;
 	}
 
 	public function notifyOnPreUpdate(f: Void->Void) {
