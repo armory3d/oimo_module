@@ -53,13 +53,14 @@ class PhysicsWorld extends Trait {
 	#end
 
 	public static var active: PhysicsWorld = null;
+	public static var nextId: Int = 0;
 	public var world: oimo.dynamics.World;
 	public var rbMap: Map<Int, RigidBody>;
 	public var timeScale: Float = 1.0;
 	var preUpdates: Array<Void->Void> = null;
 	public var hitPointWorld = new Vec4();
 	public var hitNormalWorld = new Vec4();
-	public var rayCastResult: RayCastClosestWithMask;
+	public var rayCastResult: CastClosestWithMask;
 	var contacts: Array<ContactPair>;
 
 	var debugDrawHelper: DebugDrawHelper = null;
@@ -80,7 +81,7 @@ class PhysicsWorld extends Trait {
 
 		rbMap = new Map();
 		active = this;
-		rayCastResult = new RayCastClosestWithMask();
+		rayCastResult = new CastClosestWithMask();
 		contacts = [];
 
 		// Ensure physics are updated first in the fixedUpdate list
@@ -269,7 +270,7 @@ class PhysicsWorld extends Trait {
 	}
 }
 
-private class RayCastClosestWithMask extends RayCastClosest {
+private class CastClosestWithMask extends RayCastClosest {
     public var group: Int;
     public var mask: Int;
 

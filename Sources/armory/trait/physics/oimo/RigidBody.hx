@@ -58,7 +58,6 @@ class RigidBody extends Trait {
 	public var motionState: Int; // TODO
 	public var ready: Bool = false;
 
-	static var nextId: Int = 0;
 	public var id: Int = 0;
 
 	public var onReady: Void->Void = null;
@@ -199,7 +198,7 @@ class RigidBody extends Trait {
 		massData.localInertia = new Mat3(angularFriction, 0, 0, 0, angularFriction, 0, 0, 0, angularFriction); // This applies rotation inertia instead of friction. Do not use '0' as a value.
 		body.setMassData(massData);
 
-		id = nextId++;
+		id = PhysicsWorld.nextId++;
 
 		physics.addRigidBody(this);
 		notifyOnRemove(removeFromWorld);
@@ -213,14 +212,13 @@ class RigidBody extends Trait {
 
 		if (shapeGeometry == Shape.Box) {
 			v1.init(withMargin(transform.dim.x) * 0.5, withMargin(transform.dim.y) * 0.5, withMargin(transform.dim.z) * 0.5);
-			shapeConfig.geometry = new BoxGeometry(
-				v1
-			);
+			shapeConfig.geometry = new BoxGeometry(v1);
 		}
 		else if (shapeGeometry == Shape.Sphere) {
-			shapeConfig.geometry = new SphereGeometry(
-				withMargin(transform.dim.x) * 0.5
-			);
+			var width = transform.dim.x;
+			if (transform.dim.y > width) width = transform.dim.y;
+			if (transform.dim.z > width) width = transform.dim.z;
+			shapeConfig.geometry = new SphereGeometry(withMargin(width) * 0.5);
 		}
 		else if (shapeGeometry == Shape.ConvexHull) {
 			var md: MeshData = cast(object, MeshObject).data;
@@ -229,6 +227,7 @@ class RigidBody extends Trait {
 			var sy: Float = transform.scale.y * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
 			var sz: Float = transform.scale.z * (1.0 - collisionMargin) * md.scalePos * (1 / 32767);
 			var verts: Array<Vec3> = [];
+
 			for (i in 0...Std.int(positions.length / 4)) {
 				verts.push(new Vec3(
 					positions[i * 4    ] * sx,
@@ -237,9 +236,7 @@ class RigidBody extends Trait {
 				));
 			}
 
-			shapeConfig.geometry = new ConvexHullGeometry(
-				verts
-			);
+			shapeConfig.geometry = new ConvexHullGeometry(verts);
 		}
 		else if (shapeGeometry == Shape.Mesh) {
 			var md: MeshData = cast(object, MeshObject).data;
@@ -266,10 +263,7 @@ class RigidBody extends Trait {
 				}
 			}
 
-			shapeConfig.geometry = new StaticMeshGeometry(
-				verts,
-				triangleIndices
-			);
+			shapeConfig.geometry = new StaticMeshGeometry(verts, triangleIndices);
 		}
 		else if (shapeGeometry == Shape.Cone) {
 			shapeConfig.geometry = new ConeGeometry(
@@ -288,7 +282,7 @@ class RigidBody extends Trait {
 		else if (shapeGeometry == Shape.Capsule) {
 			shapeConfig.geometry = new CapsuleGeometry(
 				withMargin(transform.dim.x) * 0.5, // Radius
-				withMargin(transform.dim.z) * 0.5 - withMargin(transform.dim.x) * 0.5// Half-height
+				withMargin(transform.dim.z) * 0.5 - withMargin(transform.dim.x) * 0.5 // Half-height
 			);
 			shapeConfig.rotation = new Mat3(1, 0, 0, 0, 0, -1, 0, 1, 0);
 		}
@@ -487,7 +481,7 @@ class RigidBody extends Trait {
 		trace("TODO");
 	}
 
-	public function setActivationState(newState: Int) {
+	public function setActivationState(state: ActivationState) {
 		// TODO -> low priority
 		trace("TODO: setActivationState");
 	}
