@@ -34,12 +34,17 @@ class ConvexHit {
 	public var hitFraction: Float;
 	public var rb: RigidBody;
 	public var character: KinematicCharacterController;
-	public function new(pos: Vec4, normal: Vec4, hitFraction: Float, rb: RigidBody = null, character: KinematicCharacterController = null){
+	public var depth: Float;
+	public var overlapping: Bool;
+
+	public function new(pos: Vec4, normal: Vec4, hitFraction: Float, rb: RigidBody = null, character: KinematicCharacterController = null, depth: Float = 0, overlapping: Bool = false) {
 		this.rb = rb;
 		this.pos = pos;
 		this.normal = normal;
 		this.hitFraction = hitFraction;
 		this.character = character;
+		this.depth = depth;
+		this.overlapping = overlapping;
 	}
 }
 
@@ -77,12 +82,13 @@ class PhysicsWorld extends Trait {
 
 	var debugDrawHelper: DebugDrawHelper = null;
 
-	// Scratch objects for `convexSweepTest`
+	// Scratch objects for convex queries
 	var sweepTransform: Transform = null;
 	var sweepBodyTransform: Transform = null;
 	var sweepRotation: oimo.common.Quat = null;
 	var sweepTranslation: Vec3 = null;
 	var sweepFrom: Vec3 = null;
+	var overlapCollector: ConvexOverlapCollector = null;
 
 	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, fixedStep = 1 / 60, debugDrawMode: DebugDrawMode = NoDebug) {
 		super();
@@ -102,6 +108,7 @@ class PhysicsWorld extends Trait {
 		active = this;
 		rayCastResult = new CastClosestWithMask();
 		convexCastResult = new CastClosestWithMask();
+		overlapCollector = new ConvexOverlapCollector();
 		contacts = [];
 
 		// Ensure physics are updated first in the fixedUpdate list
@@ -265,14 +272,42 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function convexSweepTest(rb: RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): ConvexHit {
-		var hitInfo: ConvexHit = null;
+		var convex = prepareConvexQuery(rb, from, rotation);
+		if (convex == null || to == null) return null;
+		return sweepPrepared(convex, from, to, group, mask, null);
+	}
 
-		if (rb == null || rb.body == null || world == null) return null;
+	public function convexOverlapTest(rb: RigidBody, position: Vec4, rotation: Quat, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): ConvexHit {
+		var convex = prepareConvexQuery(rb, position, rotation);
+		if (convex == null) return null;
+		return overlapPrepared(convex, group, mask, rb.body);
+	}
+
+	public function convexCast(rb: RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): ConvexHit {
+		var convex = prepareConvexQuery(rb, from, rotation);
+		if (convex == null || to == null) return null;
+
+		var hit = overlapPrepared(convex, group, mask, rb.body);
+		if (hit != null) {
+			debugConvexCast(convex, from, to, hit, 0.0);
+			return hit;
+		}
+
+		// A zero-length sweep cannot add anything after the overlap check.
+		if (from.x != to.x || from.y != to.y || from.z != to.z) {
+			hit = sweepPrepared(convex, from, to, group, mask, rb.body);
+		}
+
+		debugConvexCast(convex, from, to, hit, hit != null ? hit.hitFraction : 1.0);
+		return hit;
+	}
+
+	function prepareConvexQuery(rb: RigidBody, from: Vec4, rotation: Quat): ConvexGeometry {
+		if (rb == null || rb.body == null || world == null || from == null || rotation == null) return null;
 
 		var shape = rb.body.getShapeList();
 		if (shape == null) return null;
 
-		// Oimo's convex cast uses a single convex geometry, so use the body's first shape.
 		var geometry = shape.getGeometry();
 		if (!Std.isOfType(geometry, ConvexGeometry)) return null;
 		var convex: ConvexGeometry = cast geometry;
@@ -292,48 +327,80 @@ class PhysicsWorld extends Trait {
 
 		// Oimo's capsule/cylinder/cone geometry is Y-up. Convert to Z-up.
 		M.transform_mul(sweepTransform, shape._localTransform, sweepBodyTransform);
+		return convex;
+	}
+
+	function overlapPrepared(convex: ConvexGeometry, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody): ConvexHit {
+		overlapCollector.clear();
+		overlapCollector.group = group;
+		overlapCollector.mask = mask;
+		overlapCollector.ignoreBody = ignoreBody;
+
+		world.convexOverlap(convex, sweepTransform, overlapCollector);
+
+		if (!overlapCollector.hit) return null;
+
+		var targetBody = overlapCollector.shape._rigidBody;
+		var ud = targetBody != null ? targetBody.userData : null;
+		var character: KinematicCharacterController = Std.isOfType(ud, KinematicCharacterController) ? cast ud : null;
+		var hitRb: RigidBody = (character == null && Std.isOfType(ud, RigidBody)) ? cast ud : null;
+
+		convexHitPointWorld.set(overlapCollector.position.x, overlapCollector.position.y, overlapCollector.position.z);
+		convexHitNormalWorld.set(overlapCollector.normal.x, overlapCollector.normal.y, overlapCollector.normal.z);
+		return new ConvexHit(convexHitPointWorld, convexHitNormalWorld, 0, hitRb, character, overlapCollector.depth, true);
+	}
+
+	function sweepPrepared(convex: ConvexGeometry, from: Vec4, to: Vec4, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody): ConvexHit {
+		if (to == null) return null;
+
 		sweepTranslation.init(to.x - from.x, to.y - from.y, to.z - from.z);
 
 		convexCastResult.clear();
 		convexCastResult.group = group;
 		convexCastResult.mask = mask;
+		convexCastResult.ignoreBody = ignoreBody;
 
 		world.convexCast(convex, sweepTransform, sweepTranslation, convexCastResult);
 
-		if (convexCastResult.hit) {
-			convexCastResult.normal.negateEq();
+		if (!convexCastResult.hit) return null;
 
-			var ud = convexCastResult.shape._rigidBody.userData;
-			var character: KinematicCharacterController = Std.isOfType(ud, KinematicCharacterController) ? cast ud : null;
-			var hitRb: RigidBody = (character == null && Std.isOfType(ud, RigidBody)) ? cast ud : null;
+		convexCastResult.normal.negateEq();
 
-			convexHitPointWorld.set(convexCastResult.position.x, convexCastResult.position.y, convexCastResult.position.z);
-			convexHitNormalWorld.set(convexCastResult.normal.x, convexCastResult.normal.y, convexCastResult.normal.z);
-			hitInfo = new ConvexHit(convexHitPointWorld, convexHitNormalWorld, convexCastResult.fraction, hitRb, character);
-		}
+		var targetBody = convexCastResult.shape._rigidBody;
+		var ud = targetBody != null ? targetBody.userData : null;
+		var character: KinematicCharacterController = Std.isOfType(ud, KinematicCharacterController) ? cast ud : null;
+		var hitRb: RigidBody = (character == null && Std.isOfType(ud, RigidBody)) ? cast ud : null;
 
-		// Convex casts are shown together with raycasts (DrawRaycast).
-		if (getDebugDrawMode() & DrawRaycast != 0) {
-			var fraction = convexCastResult.hit ? convexCastResult.fraction : 1.0;
-			var startPosition = sweepTransform.getPosition();
-			var endTransform = sweepTransform.clone();
-			endTransform.setPosition(new Vec3(
-				startPosition.x + sweepTranslation.x * fraction,
-				startPosition.y + sweepTranslation.y * fraction,
-				startPosition.z + sweepTranslation.z * fraction
-			));
+		convexHitPointWorld.set(convexCastResult.position.x, convexCastResult.position.y, convexCastResult.position.z);
+		convexHitNormalWorld.set(convexCastResult.normal.x, convexCastResult.normal.y, convexCastResult.normal.z);
+		return new ConvexHit(convexHitPointWorld, convexHitNormalWorld, convexCastResult.fraction, hitRb, character);
+	}
 
-			debugDrawHelper.convexCast({
-				hasHit: convexCastResult.hit,
-				hitPoint: convexCastResult.hit ? convexHitPointWorld.clone() : null,
-				hitNormal: convexCastResult.hit ? convexHitNormalWorld.clone() : null,
-				geometry: convex,
-				startPosition: startPosition,
-				endTransform: endTransform
-			});
-		}
+	function debugConvexCast(convex: ConvexGeometry, from: Vec4, to: Vec4, hit: ConvexHit, fraction: Float): Void {
+		if (getDebugDrawMode() & DrawRaycast == 0) return;
+		if (convex == null || sweepTransform == null || from == null || to == null) return;
 
-		return hitInfo;
+		if (fraction < 0) fraction = 0;
+		else if (fraction > 1) fraction = 1;
+
+		// Copy the start position: the transform is scratch and will be reused by
+		// the next query before debug rendering happens.
+		var startPosition = sweepTransform.getPosition().clone();
+		var endTransform = sweepTransform.clone();
+		endTransform.setPosition(new Vec3(
+			startPosition.x + (to.x - from.x) * fraction,
+			startPosition.y + (to.y - from.y) * fraction,
+			startPosition.z + (to.z - from.z) * fraction
+		));
+
+		debugDrawHelper.convexCast({
+			hasHit: hit != null,
+			hitPoint: hit != null ? hit.pos.clone() : null,
+			hitNormal: hit != null ? hit.normal.clone() : null,
+			geometry: convex,
+			startPosition: startPosition,
+			endTransform: endTransform
+		});
 	}
 
 	public function notifyOnPreUpdate(f: Void->Void) {
@@ -363,6 +430,7 @@ class PhysicsWorld extends Trait {
 private class CastClosestWithMask extends RayCastClosest {
     public var group: Int;
     public var mask: Int;
+    public var ignoreBody: oimo.dynamics.rigidbody.RigidBody = null;
 
     public function new(group: Int = 0x00000001, mask: Int = 0xFFFFFFFF) {
         super();
@@ -371,6 +439,7 @@ private class CastClosestWithMask extends RayCastClosest {
 	}
 
 	override public function process(shape: Shape, hit: RayCastHit): Void {
+		if (ignoreBody != null && shape._rigidBody == ignoreBody) return;
 		if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) super.process(shape, hit);
 	}
 }
