@@ -38,6 +38,12 @@ class DebugDrawHelper extends DebugDraw {
         setDebugMode(debugDrawMode);
 
         iron.App.notifyOnRender2D(onRender2D);
+
+        if (debugDrawMode & DrawRaycast != 0) {
+            iron.App.notifyOnFixedUpdate(function() {
+                clearCasts();
+            });
+        }
     }
 
     public function setDebugMode(debugDrawMode: DebugDrawMode) {
