@@ -34,10 +34,41 @@ class KinematicCharacterController extends iron.Trait {
     public var jumpSpeed: Float;
     var shapeType: ControllerShape;
 
+    // Requested movement for the next fixed step, as a displacement vector.
+    var walkDirection: Vec4 = new Vec4();
+
+    // Gravity / jump state.
+    var gravity: Float = 9.81;
+    var gravityEnabled: Bool = true;
+    var fallSpeed: Float = 55.0;
+    var verticalVelocity: Float = 0.0;
+    var maxSlope: Float = Math.PI / 4;
+    var maxSlopeCos: Float = Math.cos(Math.PI / 4);
+    var grounded: Bool = false;
+    var upInterpolate: Bool = false;
+
     // Reusable objects for transform synchronization.
     var tempPos: Vec3 = new Vec3();
     var tempQuat: oimo.common.Quat = new oimo.common.Quat();
     var tempIronQuat: Quat = new Quat();
+
+    // Reusable objects for sweep / slide movement.
+    var movePosition: Vec4 = new Vec4();
+    var moveRemaining: Vec4 = new Vec4();
+    var moveDirection: Vec4 = new Vec4();
+    var moveNormal: Vec4 = new Vec4();
+    var moveFrom: Vec4 = new Vec4();
+    var moveTo: Vec4 = new Vec4();
+
+    // Oimo's broad-phase sweep test ignores the convex margin, so very short
+    // sweeps can miss targets that are already within the shape's margin.
+    // Probe a little further than the requested movement and clip the hit.
+    static inline var MOVE_SKIN: Float = 0.001;
+    static inline var MOVE_BACK_OFF: Float = 0.001;
+    static inline var MIN_SWEEP_DISTANCE: Float = 1.0;
+    static inline var MOVE_EPSILON: Float = 1e-6;
+    static inline var MAX_MOVE_ITERATIONS: Int = 6;
+    static inline var GROUND_SNAP_DISTANCE: Float = 0.5;
 
     public function new(mass = 1.0, shapeType: ControllerShape = ControllerShape.Capsule, jumpSpeed = 8.0, friction = 0.5, restitution = 0.0, collisionMargin = 0.0, animated = false, group = 1, mask = 1) {
         super();
@@ -233,50 +264,280 @@ class KinematicCharacterController extends iron.Trait {
         body.setPosition(tempPos);
         body.setOrientation(tempQuat);
         body.wakeUp();
+
+        // A teleport or animated pose invalidates the accumulated vertical state.
+        verticalVelocity = 0.0;
+        grounded = false;
     }
 
     public function fixedUpdate(dt: Float) {
-        // TODO: character movement
+        if (!ready || body == null || physics == null || transform == null) return;
+        moveCharacter(dt);
+    }
+
+    // Oimo's broad-phase sweep test uses only the core of a convex shape, so
+    // it can reject short sweeps that would already overlap the shape's margin.
+    function sweepProbeExtension(): Float {
+        var extension = MIN_SWEEP_DISTANCE;
+        var maxDim = Math.max(transform.dim.x, Math.max(transform.dim.y, transform.dim.z));
+        maxDim = withMargin(maxDim);
+        if (maxDim > extension) extension = maxDim;
+        return extension;
+    }
+
+    function moveCharacter(dt: Float) {
+        body.getPositionTo(tempPos);
+        body.getOrientationTo(tempQuat);
+        tempIronQuat.set(tempQuat.x, tempQuat.y, tempQuat.z, tempQuat.w);
+
+        movePosition.set(tempPos.x, tempPos.y, tempPos.z, 1.0);
+
+        var wasGrounded = grounded;
+
+        // Horizontal request plus the current vertical motion.
+        moveRemaining.set(walkDirection.x, walkDirection.y, walkDirection.z, 0.0);
+
+        if (gravityEnabled) {
+            verticalVelocity -= gravity * dt;
+            if (verticalVelocity < -fallSpeed) verticalVelocity = -fallSpeed;
+        }
+
+        moveRemaining.z += verticalVelocity * dt;
+
+        grounded = false;
+        slideMove();
+
+        // Keep contact while walking down slopes or small steps.
+        if (!grounded && wasGrounded && verticalVelocity <= 0.0) {
+            if (probeGround(GROUND_SNAP_DISTANCE)) {
+                grounded = true;
+                verticalVelocity = 0.0;
+            }
+        }
+
+        if (grounded && verticalVelocity < 0.0) verticalVelocity = 0.0;
+
+        tempPos.init(movePosition.x, movePosition.y, movePosition.z);
+        body.setPosition(tempPos);
+        body.wakeUp();
+    }
+
+    function slideMove() {
+        if (moveRemaining.length() <= MOVE_EPSILON) return;
+
+        var extension = sweepProbeExtension();
+        var iterations = 0;
+        while (iterations < MAX_MOVE_ITERATIONS) {
+            iterations++;
+
+            // Resolve penetration first: an overlapped start makes the GJK cast
+            // report "no hit", which would let the character tunnel through.
+            var overlap = physics.overlapBody(body, movePosition, tempIronQuat, group, mask, true);
+            if (overlap != null) {
+                moveNormal.set(overlap.normal.x, overlap.normal.y, overlap.normal.z, 0.0);
+                if (moveNormal.length() > MOVE_EPSILON) {
+                    moveNormal.normalize();
+                    var push = overlap.depth + MOVE_SKIN;
+
+                    movePosition.addf(
+                        moveNormal.x * push,
+                        moveNormal.y * push,
+                        moveNormal.z * push
+                    );
+
+                    if (moveNormal.z >= maxSlopeCos && verticalVelocity <= 0.0) {
+                        grounded = true;
+                        verticalVelocity = 0.0;
+                    }
+
+                    var into = moveRemaining.dot(moveNormal);
+                    if (into < 0.0) {
+                        moveRemaining.addf(
+                            -moveNormal.x * into,
+                            -moveNormal.y * into,
+                            -moveNormal.z * into
+                        );
+                    }
+                    blockClimb(moveNormal);
+                }
+                continue;
+            }
+
+            var remainingLength = moveRemaining.length();
+            if (remainingLength <= MOVE_EPSILON) break;
+
+            moveDirection.set(
+                moveRemaining.x / remainingLength,
+                moveRemaining.y / remainingLength,
+                moveRemaining.z / remainingLength,
+                0.0
+            );
+
+            // Start slightly behind the current position so an exact touch does
+            // not make GJK reject the cast as already overlapping.
+            var totalProbe = MOVE_BACK_OFF + remainingLength + extension;
+            moveFrom.set(
+                movePosition.x - moveDirection.x * MOVE_BACK_OFF,
+                movePosition.y - moveDirection.y * MOVE_BACK_OFF,
+                movePosition.z - moveDirection.z * MOVE_BACK_OFF,
+                1.0
+            );
+            moveTo.set(
+                moveFrom.x + moveDirection.x * totalProbe,
+                moveFrom.y + moveDirection.y * totalProbe,
+                moveFrom.z + moveDirection.z * totalProbe,
+                1.0
+            );
+
+            var sweep = physics.sweepBody(body, moveFrom, moveTo, tempIronQuat, group, mask, true);
+            if (sweep == null) {
+                movePosition.add(moveRemaining);
+                break;
+            }
+
+            var hitDistance = sweep.hitFraction * totalProbe - MOVE_BACK_OFF;
+            if (hitDistance > remainingLength) {
+                // The closest target is beyond this step's movement.
+                movePosition.add(moveRemaining);
+                break;
+            }
+
+            moveNormal.set(sweep.normal.x, sweep.normal.y, sweep.normal.z, 0.0);
+            if (moveNormal.length() <= MOVE_EPSILON) {
+                // Degenerate normal: stop rather than risk moving through.
+                break;
+            }
+            moveNormal.normalize();
+
+            var walkable = moveNormal.z >= maxSlopeCos;
+            if (walkable && verticalVelocity <= 0.0) {
+                grounded = true;
+                verticalVelocity = 0.0;
+            }
+            else if (moveNormal.z < 0.0 && verticalVelocity > 0.0) {
+                // Ceiling: stop upward movement.
+                verticalVelocity = 0.0;
+            }
+
+            var fraction = hitDistance <= 0.0 ? 0.0 : hitDistance / remainingLength;
+            if (fraction > 1.0) fraction = 1.0;
+
+            movePosition.addf(
+                moveRemaining.x * fraction,
+                moveRemaining.y * fraction,
+                moveRemaining.z * fraction
+            );
+
+            // Leave a small gap so the next sweep does not start touching.
+            movePosition.addf(
+                moveNormal.x * MOVE_SKIN,
+                moveNormal.y * MOVE_SKIN,
+                moveNormal.z * MOVE_SKIN
+            );
+
+            moveRemaining.mult(1.0 - fraction);
+            var into = moveRemaining.dot(moveNormal);
+            if (into < 0.0) {
+                moveRemaining.addf(
+                    -moveNormal.x * into,
+                    -moveNormal.y * into,
+                    -moveNormal.z * into
+                );
+            }
+            blockClimb(moveNormal);
+        }
+    }
+
+    // On surfaces steeper than the slope limit, keep the slide but discard any
+    // uphill part so the character cannot climb vertical faces.
+    function blockClimb(normal: Vec4) {
+        if (normal.z >= maxSlopeCos) return;
+        if (verticalVelocity > 0.0) return;
+        if (moveRemaining.z > 0.0) moveRemaining.z = 0.0;
+    }
+
+    function probeGround(maxDistance: Float): Bool {
+        if (maxDistance <= MOVE_EPSILON) return false;
+
+        var extension = sweepProbeExtension();
+        var totalProbe = MOVE_BACK_OFF + maxDistance + extension;
+
+        moveFrom.set(movePosition.x, movePosition.y, movePosition.z + MOVE_BACK_OFF, 1.0);
+        moveTo.set(movePosition.x, movePosition.y, movePosition.z + MOVE_BACK_OFF - totalProbe, 1.0);
+
+        var sweep = physics.sweepBody(body, moveFrom, moveTo, tempIronQuat, group, mask, true);
+        if (sweep == null) return false;
+
+        var hitDistance = sweep.hitFraction * totalProbe - MOVE_BACK_OFF;
+        if (hitDistance > maxDistance) return false;
+
+        moveNormal.set(sweep.normal.x, sweep.normal.y, sweep.normal.z, 0.0);
+        if (moveNormal.length() <= MOVE_EPSILON) return false;
+        moveNormal.normalize();
+
+        if (moveNormal.z < maxSlopeCos) return false;
+
+        if (hitDistance < 0.0) hitDistance = 0.0;
+
+        movePosition.z -= hitDistance;
+        movePosition.addf(
+            moveNormal.x * MOVE_SKIN,
+            moveNormal.y * MOVE_SKIN,
+            moveNormal.z * MOVE_SKIN
+        );
+        return true;
     }
 
     public function canJump(): Bool {
-        return false;
+        return grounded;
     }
 
     public function onGround(): Bool {
-        return false;
+        return grounded;
     }
 
     public function setJumpSpeed(speed: Float) {
-        jumpSpeed = speed;
+        jumpSpeed = speed > 0.0 ? speed : 0.0;
     }
 
     public function setFallSpeed(speed: Float) {
-
+        fallSpeed = speed > 0.0 ? speed : 0.0;
     }
 
     public function setMaxSlope(angleRadians: Float) {
-
+        if (angleRadians < 0.0) angleRadians = 0.0;
+        else if (angleRadians > Math.PI / 2) angleRadians = Math.PI / 2;
+        maxSlope = angleRadians;
+        maxSlopeCos = Math.cos(angleRadians);
     }
 
     public function getMaxSlope(): Float {
-        return 0.0;
+        return maxSlope;
     }
 
     public function setMaxJumpHeight(height: Float) {
-
+        if (gravity > 0.0) jumpSpeed = Math.sqrt(2.0 * gravity * height);
     }
 
     public function setWalkDirection(direction: Vec4) {
+        if (direction == null) {
+            walkDirection.set(0.0, 0.0, 0.0, 1.0);
+            return;
+        }
 
+        walkDirection.set(direction.x, direction.y, direction.z, 1.0);
     }
 
     public function setUpInterpolate(value: Bool) {
-
+        upInterpolate = value;
     }
 
     public function jump() {
+        if (!ready || body == null) return;
 
+        verticalVelocity = jumpSpeed;
+        grounded = false;
+        body.wakeUp();
     }
 
     public function removeFromWorld() {
@@ -311,19 +572,19 @@ class KinematicCharacterController extends iron.Trait {
     }
 
     public function disableGravity() {
-
+        gravityEnabled = false;
     }
 
     public function enableGravity() {
-
+        gravityEnabled = true;
     }
 
-    public function setGravity(gravity: Float) {
-
+    public function setGravity(value: Float) {
+        gravity = value;
     }
 
     public function setActivationState(state: ControllerActivationState) {
-
+        if (body != null) body.wakeUp();
     }
 
     public function setFriction(friction: Float) {
