@@ -6,8 +6,18 @@ class KinematicCharacterController extends iron.Trait {
     var ready: Bool = false;
     public var onReady: Void->Void = null;
 
-    public function new(mass = 1.0, shape: ControllerShape = ControllerShape.Capsule, jumpSpeed = 8.0, friction = 0.5, restitution = 0.0, collisionMargin = 0.0, animated = false, group = 1, mask = 1) {
+    public var id: Int = 0;
+    public var body: oimo.dynamics.rigidbody.RigidBody = null;
+    public var shape: oimo.dynamics.rigidbody.Shape = null;
+    public var group: Int = 1;
+    public var mask: Int = 1;
+
+    public function new(mass = 1.0, shapeType: ControllerShape = ControllerShape.Capsule, jumpSpeed = 8.0, friction = 0.5, restitution = 0.0, collisionMargin = 0.0, animated = false, group = 1, mask = 1) {
         super();
+
+        id = PhysicsWorld.nextId++;
+        this.group = group;
+        this.mask = mask;
     }
 
     public function notifyOnReady(f: Void->Void) {
@@ -17,6 +27,10 @@ class KinematicCharacterController extends iron.Trait {
 
     public function init() {
 
+    }
+
+    public function fixedUpdate(dt: Float) {
+        // TODO: character movement
     }
 
     public function canJump(): Bool {

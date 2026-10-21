@@ -70,6 +70,7 @@ class PhysicsWorld extends Trait {
 	public static var nextId: Int = 0;
 	public var world: oimo.dynamics.World;
 	public var rbMap: Map<Int, RigidBody>;
+	public var charMap: Map<Int, KinematicCharacterController>;
 	public var timeScale: Float = 1.0;
 	var preUpdates: Array<Void->Void> = null;
 	public var hitPointWorld = new Vec4();
@@ -101,10 +102,15 @@ class PhysicsWorld extends Trait {
 		}
 		else {
 			for (rb in active.rbMap) { @:privateAccess try { active.removeRigidBody(rb); } catch(e: haxe.Exception) { trace(e.message); } }
+			if (active.charMap != null) {
+				var characters: Array<KinematicCharacterController> = [for (c in active.charMap) c];
+				for (c in characters) { @:privateAccess try { active.removeKinematicCharacterController(c); } catch(e: haxe.Exception) { trace(e.message); } }
+			}
 			this.world = active.world;
 		}
 
 		rbMap = new Map();
+		charMap = new Map();
 		active = this;
 		rayCastResult = new CastClosestWithMask();
 		convexCastResult = new CastClosestWithMask();
@@ -118,9 +124,17 @@ class PhysicsWorld extends Trait {
 		setDebugDrawMode(debugDrawMode);
 	}
 
-	// TODO
 	public function reset() {
-		trace("TODO");
+		if (active == null) return;
+
+		var bodies: Array<RigidBody> = [for (rb in active.rbMap) rb];
+		for (rb in bodies) { @:privateAccess try { active.removeRigidBody(rb); } catch(e: haxe.Exception) { trace(e.message); } }
+
+		var characters: Array<KinematicCharacterController> = [];
+		if (active.charMap != null) for (c in active.charMap) characters.push(c);
+		for (c in characters) { @:privateAccess try { active.removeKinematicCharacterController(c); } catch(e: haxe.Exception) { trace(e.message); } }
+
+		contacts.resize(0);
 	}
 
 	function createPhysics() {
@@ -153,6 +167,54 @@ class PhysicsWorld extends Trait {
 		if (!rbMap.exists(body.id)) return;
 		if (world != null) world.removeRigidBody(body.body);
 		rbMap.remove(body.id);
+	}
+
+	public function addKinematicCharacterController(controller: KinematicCharacterController) {
+		if (world == null || controller == null || controller.body == null) return;
+		if (charMap.exists(controller.id)) return;
+
+		if (controller.body._world == null) world.addRigidBody(controller.body);
+		else if (controller.body._world != world) return;
+
+		charMap.set(controller.id, controller);
+	}
+
+	public function removeKinematicCharacterController(controller: KinematicCharacterController) {
+		if (controller == null) return;
+
+		if (charMap != null) charMap.remove(controller.id);
+
+		if (world != null && controller.body != null && controller.body._world == world) world.removeRigidBody(controller.body);
+	}
+
+	public function updateKinematicCharacterController(controller: KinematicCharacterController) {
+		if (controller == null || controller.shape == null) return;
+
+		controller.shape.setCollisionGroup(controller.group);
+		controller.shape.setCollisionMask(controller.mask);
+	}
+
+	public function findCharacter(id: Int): KinematicCharacterController {
+		return charMap != null ? charMap.get(id) : null;
+	}
+
+	public function getOverlappingBodies(character: KinematicCharacterController): Array<RigidBody> {
+		if (character == null || world == null || character.body == null) return null;
+
+		var res: Array<RigidBody> = [];
+		var contact = world.getContactManager().getContactList();
+		while (contact != null) {
+			if (contact._touching && (contact._b1 == character.body || contact._b2 == character.body)) {
+				var other = contact._b1 == character.body ? contact._b2 : contact._b1;
+				var ud = other != null ? other.userData : null;
+				if (Std.isOfType(ud, RigidBody)) {
+					var rb: RigidBody = cast ud;
+					if (res.indexOf(rb) == -1) res.push(rb);
+				}
+			}
+			contact = contact.getNext();
+		}
+		return res;
 	}
 
 	// TODO
@@ -198,6 +260,11 @@ class PhysicsWorld extends Trait {
 
 		if (preUpdates != null) for (f in preUpdates) f();
 
+		if (charMap != null) {
+			var characters: Array<KinematicCharacterController> = [for (c in charMap) c];
+			for (c in characters) c.fixedUpdate(Time.fixedStep * ts);
+		}
+
 		world.step(Time.fixedStep * ts);
 		updateContacts();
 		for (rb in rbMap) { @:privateAccess try { rb.physicsUpdate(); } catch(e: haxe.Exception) { trace(e.message); } }
@@ -212,20 +279,26 @@ class PhysicsWorld extends Trait {
 
 		var contact_list = world.getContactManager().getContactList();
 		while(contact_list != null) {
-			var b1: RigidBody = cast(contact_list._b1.userData, RigidBody);
-			var b2: RigidBody = cast(contact_list._b2.userData, RigidBody);
-			var cp: ContactPair = new ContactPair(b1.id, b2.id);
-			for (pt in contact_list.getManifold().getPoints()) {
-				if (pt.getDepth() > 0) {
-					var posA: Vec3 = pt.getPosition1();
-					var posB: Vec3 = pt.getPosition2();
-					var nor: Vec3  = contact_list.getManifold().getNormal();
-					cp.posA = new Vec4(posA.x, posA.y, posA.z);
-					cp.posB = new Vec4(posB.x, posB.y, posB.z);
-					cp.nor  = new Vec4(nor.x,  nor.y,  nor.z );
-					cp.impulse = pt.getNormalImpulse();
-					contacts.push(cp);
-					break;
+			var ud1 = contact_list._b1 != null ? contact_list._b1.userData : null;
+			var ud2 = contact_list._b2 != null ? contact_list._b2.userData : null;
+
+			// Characters use a trigger body and are not part of rbMap.
+			if (Std.isOfType(ud1, RigidBody) && Std.isOfType(ud2, RigidBody)) {
+				var b1: RigidBody = cast ud1;
+				var b2: RigidBody = cast ud2;
+				var cp: ContactPair = new ContactPair(b1.id, b2.id);
+				for (pt in contact_list.getManifold().getPoints()) {
+					if (pt.getDepth() > 0) {
+						var posA: Vec3 = pt.getPosition1();
+						var posB: Vec3 = pt.getPosition2();
+						var nor: Vec3  = contact_list.getManifold().getNormal();
+						cp.posA = new Vec4(posA.x, posA.y, posA.z);
+						cp.posB = new Vec4(posB.x, posB.y, posB.z);
+						cp.nor  = new Vec4(nor.x,  nor.y,  nor.z );
+						cp.impulse = pt.getNormalImpulse();
+						contacts.push(cp);
+						break;
+					}
 				}
 			}
 			contact_list = contact_list.getNext();
@@ -271,6 +344,20 @@ class PhysicsWorld extends Trait {
 		return hitInfo;
 	}
 
+	@:allow(armory.trait.physics.oimo)
+	function overlapBody(body: oimo.dynamics.rigidbody.RigidBody, position: Vec4, rotation: Quat, group: Int, mask: Int, ignoreTriggers: Bool): ConvexHit {
+		var convex = prepareConvexQueryForBody(body, position, rotation);
+		if (convex == null) return null;
+		return overlapPrepared(convex, group, mask, body, ignoreTriggers);
+	}
+
+	@:allow(armory.trait.physics.oimo)
+	function sweepBody(body: oimo.dynamics.rigidbody.RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int, mask: Int, ignoreTriggers: Bool): ConvexHit {
+		var convex = prepareConvexQueryForBody(body, from, rotation);
+		if (convex == null || to == null) return null;
+		return sweepPrepared(convex, from, to, group, mask, body, ignoreTriggers);
+	}
+
 	public function convexSweepTest(rb: RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): ConvexHit {
 		var convex = prepareConvexQuery(rb, from, rotation);
 		if (convex == null || to == null) return null;
@@ -303,9 +390,14 @@ class PhysicsWorld extends Trait {
 	}
 
 	function prepareConvexQuery(rb: RigidBody, from: Vec4, rotation: Quat): ConvexGeometry {
-		if (rb == null || rb.body == null || world == null || from == null || rotation == null) return null;
+		if (rb == null) return null;
+		return prepareConvexQueryForBody(rb.body, from, rotation);
+	}
 
-		var shape = rb.body.getShapeList();
+	function prepareConvexQueryForBody(body: oimo.dynamics.rigidbody.RigidBody, from: Vec4, rotation: Quat): ConvexGeometry {
+		if (body == null || world == null || from == null || rotation == null) return null;
+
+		var shape = body.getShapeList();
 		if (shape == null) return null;
 
 		var geometry = shape.getGeometry();
@@ -330,11 +422,12 @@ class PhysicsWorld extends Trait {
 		return convex;
 	}
 
-	function overlapPrepared(convex: ConvexGeometry, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody): ConvexHit {
+	function overlapPrepared(convex: ConvexGeometry, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody, ignoreTriggers: Bool = false): ConvexHit {
 		overlapCollector.clear();
 		overlapCollector.group = group;
 		overlapCollector.mask = mask;
 		overlapCollector.ignoreBody = ignoreBody;
+		overlapCollector.ignoreTriggers = ignoreTriggers;
 
 		world.convexOverlap(convex, sweepTransform, overlapCollector);
 
@@ -350,7 +443,7 @@ class PhysicsWorld extends Trait {
 		return new ConvexHit(convexHitPointWorld, convexHitNormalWorld, 0, hitRb, character, overlapCollector.depth, true);
 	}
 
-	function sweepPrepared(convex: ConvexGeometry, from: Vec4, to: Vec4, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody): ConvexHit {
+	function sweepPrepared(convex: ConvexGeometry, from: Vec4, to: Vec4, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody, ignoreTriggers: Bool = false): ConvexHit {
 		if (to == null) return null;
 
 		sweepTranslation.init(to.x - from.x, to.y - from.y, to.z - from.z);
@@ -359,6 +452,7 @@ class PhysicsWorld extends Trait {
 		convexCastResult.group = group;
 		convexCastResult.mask = mask;
 		convexCastResult.ignoreBody = ignoreBody;
+		convexCastResult.ignoreTriggers = ignoreTriggers;
 
 		world.convexCast(convex, sweepTransform, sweepTranslation, convexCastResult);
 
@@ -431,6 +525,7 @@ private class CastClosestWithMask extends RayCastClosest {
     public var group: Int;
     public var mask: Int;
     public var ignoreBody: oimo.dynamics.rigidbody.RigidBody = null;
+    public var ignoreTriggers: Bool = false;
 
     public function new(group: Int = 0x00000001, mask: Int = 0xFFFFFFFF) {
         super();
@@ -440,6 +535,7 @@ private class CastClosestWithMask extends RayCastClosest {
 
 	override public function process(shape: Shape, hit: RayCastHit): Void {
 		if (ignoreBody != null && shape._rigidBody == ignoreBody) return;
+		if (ignoreTriggers && shape._isTrigger) return;
 		if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) super.process(shape, hit);
 	}
 }

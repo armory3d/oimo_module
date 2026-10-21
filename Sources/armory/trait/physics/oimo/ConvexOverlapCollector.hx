@@ -17,6 +17,7 @@ class ConvexOverlapCollector extends ConvexOverlapCallback {
 	public var group: Int = 0x00000001;
 	public var mask: Int = 0xFFFFFFFF;
 	public var ignoreBody: oimo.dynamics.rigidbody.RigidBody = null;
+	public var ignoreTriggers: Bool = false;
 
 	public var shape: Shape = null;
 	public var position: Vec3 = new Vec3();
@@ -39,6 +40,7 @@ class ConvexOverlapCollector extends ConvexOverlapCallback {
 	override public function process(shape: Shape, hit: ConvexOverlapHit): Void {
 		if (shape == null || hit == null || hit.numPoints == 0) return;
 		if (ignoreBody != null && shape._rigidBody == ignoreBody) return;
+		if (ignoreTriggers && shape._isTrigger) return;
 		if ((mask & shape.getCollisionGroup() == 0) || (shape.getCollisionMask() & group == 0)) return;
 
 		var bestDepth: Float = -1;
