@@ -847,8 +847,8 @@ enum abstract ControllerShape(Int) from Int to Int {
     var Box = 0;
     var Sphere = 1;
     var Capsule = 5;
-    var Cylinder = 6;
-    var Cone = 4;
+    var Cylinder = 4;
+    var Cone = 3;
     var ConvexHull = 2;
 }
 
