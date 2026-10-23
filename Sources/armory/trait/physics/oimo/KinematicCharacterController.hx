@@ -15,6 +15,7 @@ import oimo.dynamics.rigidbody.RigidBodyType;
 import oimo.dynamics.rigidbody.Shape;
 import oimo.dynamics.rigidbody.ShapeConfig;
 
+// The algorithms are taking inspiration from Bullet's btKinematicCharacterController and Godot's CharacterBody3D.
 class KinematicCharacterController extends iron.Trait {
     public var ready: Bool = false;
     public var onReady: Void->Void = null;
@@ -77,9 +78,6 @@ class KinematicCharacterController extends iron.Trait {
     static inline var CONTACT_CLEARANCE: Float = 0.01;
     static inline var MOVE_EPSILON: Float = 1e-6;
     static inline var NORMAL_EPSILON: Float = 0.0001;
-    // Slack on the slope limit, in cosine units. 0.007 is ~0.01 rad at 45
-    // degrees (Godot uses the same angle slack): a surface sitting exactly on
-    // the limit must not flip between "floor" and "wall" from tick to tick.
     static inline var SLOPE_EPSILON: Float = 0.007;
     static inline var MAX_MOVE_ITERATIONS: Int = 10;
     static inline var MAX_FALL_ITERATIONS: Int = 3;
