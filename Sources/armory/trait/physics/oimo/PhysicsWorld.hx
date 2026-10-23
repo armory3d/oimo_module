@@ -71,6 +71,7 @@ class PhysicsWorld extends Trait {
 	public var world: oimo.dynamics.World;
 	public var rbMap: Map<Int, RigidBody>;
 	public var charMap: Map<Int, KinematicCharacterController>;
+	var bodyList: Array<RigidBody> = [];
 	var characterList: Array<KinematicCharacterController> = [];
 	public var timeScale: Float = 1.0;
 	var preUpdates: Array<Void->Void> = null;
@@ -102,9 +103,10 @@ class PhysicsWorld extends Trait {
 			createPhysics();
 		}
 		else {
-			for (rb in active.rbMap) { @:privateAccess try { active.removeRigidBody(rb); } catch(e: haxe.Exception) { trace(e.message); } }
-			var characters: Array<KinematicCharacterController> = [for (c in active.charMap) c];
-			for (c in characters) { @:privateAccess try { active.removeKinematicCharacterController(c); } catch(e: haxe.Exception) { trace(e.message); } }
+			copyValues(active.rbMap, bodyList);
+			for (rb in bodyList) @:privateAccess active.removeRigidBody(rb);
+			copyValues(active.charMap, characterList);
+			for (c in characterList) @:privateAccess active.removeKinematicCharacterController(c);
 			this.world = active.world;
 		}
 
@@ -116,7 +118,6 @@ class PhysicsWorld extends Trait {
 		overlapCollector = new ConvexOverlapCollector();
 		contacts = [];
 
-		// Ensure physics are updated first in the fixedUpdate list
 		_fixedUpdate = [fixedUpdate];
 		@:privateAccess iron.App.traitFixedUpdates.insert(0, fixedUpdate);
 
@@ -126,14 +127,18 @@ class PhysicsWorld extends Trait {
 	public function reset() {
 		if (active == null) return;
 
-		var bodies: Array<RigidBody> = [for (rb in active.rbMap) rb];
-		for (rb in bodies) { @:privateAccess try { active.removeRigidBody(rb); } catch(e: haxe.Exception) { trace(e.message); } }
+		copyValues(active.rbMap, bodyList);
+		for (rb in bodyList) @:privateAccess active.removeRigidBody(rb);
 
-		var characters: Array<KinematicCharacterController> = [];
-		for (c in active.charMap) characters.push(c);
-		for (c in characters) { @:privateAccess try { active.removeKinematicCharacterController(c); } catch(e: haxe.Exception) { trace(e.message); } }
+		copyValues(active.charMap, characterList);
+		for (c in characterList) @:privateAccess active.removeKinematicCharacterController(c);
 
 		contacts.resize(0);
+	}
+
+	static inline function copyValues<T>(source: Map<Int, T>, into: Array<T>) {
+		into.resize(0);
+		for (value in source) into.push(value);
 	}
 
 	function createPhysics() {
@@ -232,8 +237,8 @@ class PhysicsWorld extends Trait {
 		if (contacts.length == 0) return null;
 		var res: Array<RigidBody> = [];
 		for (c in contacts) {
-			if (c.a == body.id) res.push(rbMap.get(c.b));
-			else if (c.b == body.id) res.push(rbMap.get(c.a));
+			var other = c.a == body.id ? rbMap.get(c.b) : (c.b == body.id ? rbMap.get(c.a) : null);
+			if (other != null) res.push(other);
 		}
 		return res;
 	}
@@ -266,14 +271,14 @@ class PhysicsWorld extends Trait {
 
 		if (preUpdates != null) for (f in preUpdates) f();
 
-		// Copy first: a character may remove itself from charMap while stepping.
-		characterList.resize(0);
-		for (c in charMap) characterList.push(c);
-		for (c in characterList) c.fixedUpdate(Time.fixedStep * ts);
+		copyValues(charMap, characterList);
+		for (c in characterList) if (charMap.exists(c.id)) c.fixedUpdate(Time.fixedStep * ts);
 
 		world.step(Time.fixedStep * ts);
 		updateContacts();
-		for (rb in rbMap) { @:privateAccess try { rb.physicsUpdate(); } catch(e: haxe.Exception) { trace(e.message); } }
+
+		copyValues(rbMap, bodyList);
+		for (rb in bodyList) if (rbMap.exists(rb.id)) @:privateAccess rb.physicsUpdate();
 
 		#if arm_debug
 		physTime = kha.Scheduler.realTime() - startTime;
@@ -386,7 +391,6 @@ class PhysicsWorld extends Trait {
 			return hit;
 		}
 
-		// A zero-length sweep cannot add anything after the overlap check.
 		if (from.x != to.x || from.y != to.y || from.z != to.z) {
 			hit = sweepPrepared(convex, from, to, group, mask, rb.body);
 		}
@@ -423,7 +427,6 @@ class PhysicsWorld extends Trait {
 		sweepBodyTransform.setPosition(sweepFrom);
 		sweepBodyTransform.setOrientation(sweepRotation);
 
-		// Oimo's capsule/cylinder/cone geometry is Y-up. Convert to Z-up.
 		M.transform_mul(sweepTransform, shape._localTransform, sweepBodyTransform);
 		return convex;
 	}
@@ -492,8 +495,6 @@ class PhysicsWorld extends Trait {
 		if (fraction < 0) fraction = 0;
 		else if (fraction > 1) fraction = 1;
 
-		// Copy the start position: the transform is scratch and will be reused by
-		// the next query before debug rendering happens.
 		var startPosition = sweepTransform.getPosition().clone();
 		var endTransform = sweepTransform.clone();
 		endTransform.setPosition(new Vec3(
