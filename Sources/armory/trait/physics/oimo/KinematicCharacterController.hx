@@ -1,5 +1,6 @@
 package armory.trait.physics.oimo;
 
+import armory.trait.physics.oimo.PhysicsWorld.ConvexHit;
 import iron.data.MeshData;
 import iron.math.Quat;
 import iron.math.Vec4;
@@ -15,7 +16,7 @@ import oimo.dynamics.rigidbody.Shape;
 import oimo.dynamics.rigidbody.ShapeConfig;
 
 class KinematicCharacterController extends iron.Trait {
-    var ready: Bool = false;
+    public var ready: Bool = false;
     public var onReady: Void->Void = null;
 
     public var id: Int = 0;
@@ -34,25 +35,30 @@ class KinematicCharacterController extends iron.Trait {
     public var jumpSpeed: Float;
     var shapeType: ControllerShape;
 
-    // Requested movement for the next fixed step, as a displacement vector.
     var walkDirection: Vec4 = new Vec4();
-
-    // Gravity / jump state.
-    var gravity: Float = 9.81;
-    var gravityEnabled: Bool = true;
+    var up: Vec4 = new Vec4(0.0, 0.0, 1.0, 0.0);
+    var stepHeight: Float = 0.5;
+    var gravity: Float = 9.8 * 3.0;
     var fallSpeed: Float = 55.0;
     var verticalVelocity: Float = 0.0;
+    var verticalOffset: Float = 0.0;
     var maxSlope: Float = Math.PI / 4;
     var maxSlopeCos: Float = Math.cos(Math.PI / 4);
+    var slopeTan: Float = 1.0;
+    var currentStepOffset: Float = 0.0;
     var grounded: Bool = false;
-    var upInterpolate: Bool = false;
+    var stepBlocked: Bool = false;
+    var footRadius: Float = 0.0;
+    var lastDirection: Vec4 = new Vec4(0.0, 0.0, 0.0, 0.0);
+    var maxJumpHeight: Float = 0.0;
+    var upInterpolate: Bool = true;
+    var defaultJumpSpeed: Float = 8.0;
+    var jumpAxis: Vec4 = new Vec4(0.0, 0.0, 1.0, 0.0);
 
-    // Reusable objects for transform synchronization.
     var tempPos: Vec3 = new Vec3();
     var tempQuat: oimo.common.Quat = new oimo.common.Quat();
     var tempIronQuat: Quat = new Quat();
 
-    // Reusable objects for sweep / slide movement.
     var movePosition: Vec4 = new Vec4();
     var moveRemaining: Vec4 = new Vec4();
     var moveDirection: Vec4 = new Vec4();
@@ -60,15 +66,25 @@ class KinematicCharacterController extends iron.Trait {
     var moveFrom: Vec4 = new Vec4();
     var moveTo: Vec4 = new Vec4();
 
-    // Oimo's broad-phase sweep test ignores the convex margin, so very short
-    // sweeps can miss targets that are already within the shape's margin.
-    // Probe a little further than the requested movement and clip the hit.
-    static inline var MOVE_SKIN: Float = 0.001;
-    static inline var MOVE_BACK_OFF: Float = 0.001;
-    static inline var MIN_SWEEP_DISTANCE: Float = 1.0;
+    var planeNormals: Array<Vec4> = [new Vec4(), new Vec4(), new Vec4()];
+    var planeCount: Int = 0;
+
+    var fallMotion: Vec4 = new Vec4();
+    var fallNormal: Vec4 = new Vec4();
+    var lastValidPosition: Vec4 = new Vec4();
+    var lastValidOk: Bool = false;
+
+    static inline var CONTACT_CLEARANCE: Float = 0.01;
     static inline var MOVE_EPSILON: Float = 1e-6;
-    static inline var MAX_MOVE_ITERATIONS: Int = 6;
-    static inline var GROUND_SNAP_DISTANCE: Float = 0.5;
+    static inline var NORMAL_EPSILON: Float = 0.0001;
+    // Slack on the slope limit, in cosine units. 0.007 is ~0.01 rad at 45
+    // degrees (Godot uses the same angle slack): a surface sitting exactly on
+    // the limit must not flip between "floor" and "wall" from tick to tick.
+    static inline var SLOPE_EPSILON: Float = 0.007;
+    static inline var MAX_MOVE_ITERATIONS: Int = 10;
+    static inline var MAX_FALL_ITERATIONS: Int = 3;
+    static inline var MAX_SLIDE_PLANES: Int = 3;
+    static inline var RECOVER_ITERATIONS: Int = 4;
 
     public function new(mass = 1.0, shapeType: ControllerShape = ControllerShape.Capsule, jumpSpeed = 8.0, friction = 0.5, restitution = 0.0, collisionMargin = 0.0, animated = false, group = 1, mask = 1) {
         super();
@@ -76,6 +92,7 @@ class KinematicCharacterController extends iron.Trait {
         this.mass = mass;
         this.shapeType = shapeType;
         this.jumpSpeed = jumpSpeed;
+        this.defaultJumpSpeed = jumpSpeed;
         this.friction = friction;
         this.restitution = restitution;
         this.collisionMargin = collisionMargin;
@@ -116,6 +133,11 @@ class KinematicCharacterController extends iron.Trait {
 
         shape = createShape();
         if (shape == null) return;
+
+        var width = transform.dim.x > transform.dim.y ? transform.dim.x : transform.dim.y;
+        footRadius = withMargin(width) * 0.5;
+
+        jumpAxis.set(up.x, up.y, up.z, 0.0);
 
         var bodyConfig = new RigidBodyConfig();
         bodyConfig.type = RigidBodyType.KINEMATIC;
@@ -212,8 +234,11 @@ class KinematicCharacterController extends iron.Trait {
             shapeConfig.geometry = new ConvexHullGeometry(verts);
         }
         else {
-            trace("KinematicCharacterController: unsupported shape type " + shapeType);
-            return null;
+            var width = transform.dim.x;
+            if (transform.dim.y > width) width = transform.dim.y;
+            if (transform.dim.z > width) width = transform.dim.z;
+            shapeConfig.geometry = new SphereGeometry(withMargin(width) * 0.5);
+            trace("KinematicCharacterController: unsupported shape type " + shapeType + ". Fallinback to SPHERE." );
         }
 
         var volume = shapeConfig.geometry._volume;
@@ -267,7 +292,12 @@ class KinematicCharacterController extends iron.Trait {
 
         // A teleport or animated pose invalidates the accumulated vertical state.
         verticalVelocity = 0.0;
+        verticalOffset = 0.0;
+        currentStepOffset = 0.0;
         grounded = false;
+        stepBlocked = false;
+        lastDirection.set(0.0, 0.0, 0.0, 0.0);
+        lastValidOk = false;
     }
 
     public function fixedUpdate(dt: Float) {
@@ -275,14 +305,22 @@ class KinematicCharacterController extends iron.Trait {
         moveCharacter(dt);
     }
 
-    // Oimo's broad-phase sweep test uses only the core of a convex shape, so
-    // it can reject short sweeps that would already overlap the shape's margin.
-    function sweepProbeExtension(): Float {
-        var extension = MIN_SWEEP_DISTANCE;
-        var maxDim = Math.max(transform.dim.x, Math.max(transform.dim.y, transform.dim.z));
-        maxDim = withMargin(maxDim);
-        if (maxDim > extension) extension = maxDim;
-        return extension;
+    inline function upDot(v: Vec4): Float {
+        return up.x * v.x + up.y * v.y + up.z * v.z;
+    }
+
+    inline function upShift(v: Vec4, distance: Float): Void {
+        v.x += up.x * distance;
+        v.y += up.y * distance;
+        v.z += up.z * distance;
+    }
+
+    inline function horizontalLength(v: Vec4): Float {
+        var along = upDot(v);
+        var x = v.x - up.x * along;
+        var y = v.y - up.y * along;
+        var z = v.z - up.z * along;
+        return Math.sqrt(x * x + y * y + z * z);
     }
 
     function moveCharacter(dt: Float) {
@@ -292,76 +330,161 @@ class KinematicCharacterController extends iron.Trait {
 
         movePosition.set(tempPos.x, tempPos.y, tempPos.z, 1.0);
 
-        var wasGrounded = grounded;
+        lastValidOk = recoverPenetration();
+        lastValidPosition.set(movePosition.x, movePosition.y, movePosition.z, 1.0);
 
-        // Horizontal request plus the current vertical motion.
-        moveRemaining.set(walkDirection.x, walkDirection.y, walkDirection.z, 0.0);
+        // Same vertical velocity integration and clamping as Bullet.
+        verticalVelocity -= gravity * dt;
+        if (verticalVelocity > jumpSpeed) verticalVelocity = jumpSpeed;
+        if (verticalVelocity < -fallSpeed) verticalVelocity = -fallSpeed;
+        verticalOffset = verticalVelocity * dt;
 
-        if (gravityEnabled) {
-            verticalVelocity -= gravity * dt;
-            if (verticalVelocity < -fallSpeed) verticalVelocity = -fallSpeed;
-        }
+        var startX = movePosition.x;
+        var startY = movePosition.y;
+        var startZ = movePosition.z;
 
-        moveRemaining.z += verticalVelocity * dt;
+        currentStepOffset = 0.0;
 
-        grounded = false;
-        slideMove();
-
-        // Keep contact while walking down slopes or small steps.
-        if (!grounded && wasGrounded && verticalVelocity <= 0.0) {
-            if (probeGround(GROUND_SNAP_DISTANCE)) {
-                grounded = true;
+        if (verticalVelocity > 0.0) {
+            // Rising: apply the jump displacement along the jump axis, stopped only by a ceiling.
+            var rise = riseAlong(jumpAxis, verticalOffset);
+            stepForwardAndStrafe();
+            // A ceiling ends the jump: cancel the upward velocity instead of pressing
+            // into it for the rest of the ascent.
+            if (rise < verticalOffset - MOVE_EPSILON) {
                 verticalVelocity = 0.0;
+                verticalOffset = 0.0;
             }
+            grounded = false;
+        }
+        else {
+            var walked = stepForwardAndStrafe();
+            // part of the walk direction, not its full length.
+            var walkLength = horizontalLength(walkDirection);
+            var steppedUp = false;
+
+            if (stepBlocked && walked < walkLength - MOVE_EPSILON) {
+                var walkedX = movePosition.x;
+                var walkedY = movePosition.y;
+                var walkedZ = movePosition.z;
+
+                movePosition.set(startX, startY, startZ, 1.0);
+                var rise = riseAlong(up, stepHeight);
+
+                if (rise > MOVE_EPSILON) {
+                    var stepped = stepForwardAndStrafe();
+                    if (stepped > walked + MOVE_EPSILON) {
+                        currentStepOffset = rise;
+                        steppedUp = true;
+                    }
+                    else {
+                        movePosition.set(walkedX, walkedY, walkedZ, 1.0);
+                    }
+                }
+            }
+
+            var dx = movePosition.x - startX;
+            var dy = movePosition.y - startY;
+            var dz = movePosition.z - startZ;
+            var alongUp = up.x * dx + up.y * dy + up.z * dz;
+            dx -= up.x * alongUp;
+            dy -= up.y * alongUp;
+            dz -= up.z * alongUp;
+            var horizontalDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            stepDown(dt, horizontalDistance, steppedUp);
         }
 
-        if (grounded && verticalVelocity < 0.0) verticalVelocity = 0.0;
+        if (!recoverPenetration() && lastValidOk) {
+            movePosition.set(lastValidPosition.x, lastValidPosition.y, lastValidPosition.z, 1.0);
+            recoverPenetration();
+            grounded = false;
+        }
 
         tempPos.init(movePosition.x, movePosition.y, movePosition.z);
         body.setPosition(tempPos);
         body.wakeUp();
     }
 
-    function slideMove() {
-        if (moveRemaining.length() <= MOVE_EPSILON) return;
+    // Moves the character along `dir` by up to `distance`, stopping short of ceilings.
+    // Returns the distance actually travelled.
+    function riseAlong(dir: Vec4, distance: Float): Float {
+        if (distance <= MOVE_EPSILON) return 0.0;
 
-        var extension = sweepProbeExtension();
+        moveFrom.set(movePosition.x, movePosition.y, movePosition.z, 1.0);
+        moveTo.set(
+            moveFrom.x + dir.x * distance,
+            moveFrom.y + dir.y * distance,
+            moveFrom.z + dir.z * distance,
+            1.0
+        );
+
+        // Unfiltered: only ceilings can shorten the rise, slopes and walls are classified afterwards.
+        var sweep = physics.sweepBody(body, moveFrom, moveTo, tempIronQuat, group, mask, true);
+        var travelled = distance;
+        if (sweep != null) {
+            moveNormal.set(sweep.normal.x, sweep.normal.y, sweep.normal.z, 0.0);
+            if (moveNormal.length() > MOVE_EPSILON) {
+                moveNormal.normalize();
+                if (upDot(moveNormal) < -NORMAL_EPSILON) {
+                    var hitDistance = sweep.hitFraction * distance - CONTACT_CLEARANCE;
+                    if (hitDistance < 0.0) hitDistance = 0.0;
+                    if (hitDistance < travelled) travelled = hitDistance;
+                }
+            }
+        }
+
+        movePosition.x += dir.x * travelled;
+        movePosition.y += dir.y * travelled;
+        movePosition.z += dir.z * travelled;
+        return travelled;
+    }
+
+    function recoverPenetration(): Bool {
+        var iterations = 0;
+        while (iterations < RECOVER_ITERATIONS) {
+            iterations++;
+
+            var overlap = physics.overlapBody(body, movePosition, tempIronQuat, group, mask, true);
+            if (overlap == null) return true;
+            if (overlap.depth <= CONTACT_CLEARANCE) return true;
+
+            moveNormal.set(overlap.normal.x, overlap.normal.y, overlap.normal.z, 0.0);
+            if (moveNormal.length() <= MOVE_EPSILON) return false;
+            moveNormal.normalize();
+
+            var push = overlap.depth + CONTACT_CLEARANCE;
+            movePosition.addf(moveNormal.x * push, moveNormal.y * push, moveNormal.z * push);
+        }
+
+        var overlap = physics.overlapBody(body, movePosition, tempIronQuat, group, mask, true);
+        return overlap == null || overlap.depth <= CONTACT_CLEARANCE;
+    }
+
+    function stepForwardAndStrafe(): Float {
+        moveRemaining.set(walkDirection.x, walkDirection.y, walkDirection.z, 0.0);
+
+        var along = upDot(walkDirection);
+        var hx = walkDirection.x - up.x * along;
+        var hy = walkDirection.y - up.y * along;
+        var hz = walkDirection.z - up.z * along;
+        var hl = Math.sqrt(hx * hx + hy * hy + hz * hz);
+        if (hl > MOVE_EPSILON) lastDirection.set(hx / hl, hy / hl, hz / hl, 0.0);
+
+        return slideMove();
+    }
+
+    function slideMove(): Float {
+        var startX = movePosition.x;
+        var startY = movePosition.y;
+        var startZ = movePosition.z;
+
+        stepBlocked = false;
+        planeCount = 0;
+
         var iterations = 0;
         while (iterations < MAX_MOVE_ITERATIONS) {
             iterations++;
-
-            // Resolve penetration first: an overlapped start makes the GJK cast
-            // report "no hit", which would let the character tunnel through.
-            var overlap = physics.overlapBody(body, movePosition, tempIronQuat, group, mask, true);
-            if (overlap != null) {
-                moveNormal.set(overlap.normal.x, overlap.normal.y, overlap.normal.z, 0.0);
-                if (moveNormal.length() > MOVE_EPSILON) {
-                    moveNormal.normalize();
-                    var push = overlap.depth + MOVE_SKIN;
-
-                    movePosition.addf(
-                        moveNormal.x * push,
-                        moveNormal.y * push,
-                        moveNormal.z * push
-                    );
-
-                    if (moveNormal.z >= maxSlopeCos && verticalVelocity <= 0.0) {
-                        grounded = true;
-                        verticalVelocity = 0.0;
-                    }
-
-                    var into = moveRemaining.dot(moveNormal);
-                    if (into < 0.0) {
-                        moveRemaining.addf(
-                            -moveNormal.x * into,
-                            -moveNormal.y * into,
-                            -moveNormal.z * into
-                        );
-                    }
-                    blockClimb(moveNormal);
-                }
-                continue;
-            }
 
             var remainingLength = moveRemaining.length();
             if (remainingLength <= MOVE_EPSILON) break;
@@ -373,123 +496,239 @@ class KinematicCharacterController extends iron.Trait {
                 0.0
             );
 
-            // Start slightly behind the current position so an exact touch does
-            // not make GJK reject the cast as already overlapping.
-            var totalProbe = MOVE_BACK_OFF + remainingLength + extension;
-            moveFrom.set(
-                movePosition.x - moveDirection.x * MOVE_BACK_OFF,
-                movePosition.y - moveDirection.y * MOVE_BACK_OFF,
-                movePosition.z - moveDirection.z * MOVE_BACK_OFF,
-                1.0
-            );
+            moveFrom.set(movePosition.x, movePosition.y, movePosition.z, 1.0);
             moveTo.set(
-                moveFrom.x + moveDirection.x * totalProbe,
-                moveFrom.y + moveDirection.y * totalProbe,
-                moveFrom.z + moveDirection.z * totalProbe,
+                moveFrom.x + moveRemaining.x,
+                moveFrom.y + moveRemaining.y,
+                moveFrom.z + moveRemaining.z,
                 1.0
             );
 
-            var sweep = physics.sweepBody(body, moveFrom, moveTo, tempIronQuat, group, mask, true);
+            var sweep = physics.sweepBody(body, moveFrom, moveTo, tempIronQuat, group, mask, true, 0.0, up);
             if (sweep == null) {
-                movePosition.add(moveRemaining);
-                break;
-            }
-
-            var hitDistance = sweep.hitFraction * totalProbe - MOVE_BACK_OFF;
-            if (hitDistance > remainingLength) {
-                // The closest target is beyond this step's movement.
-                movePosition.add(moveRemaining);
+                movePosition.x += moveRemaining.x;
+                movePosition.y += moveRemaining.y;
+                movePosition.z += moveRemaining.z;
                 break;
             }
 
             moveNormal.set(sweep.normal.x, sweep.normal.y, sweep.normal.z, 0.0);
-            if (moveNormal.length() <= MOVE_EPSILON) {
-                // Degenerate normal: stop rather than risk moving through.
-                break;
-            }
+            if (moveNormal.length() <= MOVE_EPSILON) break;
             moveNormal.normalize();
 
-            var walkable = moveNormal.z >= maxSlopeCos;
-            if (walkable && verticalVelocity <= 0.0) {
-                grounded = true;
-                verticalVelocity = 0.0;
-            }
-            else if (moveNormal.z < 0.0 && verticalVelocity > 0.0) {
-                // Ceiling: stop upward movement.
-                verticalVelocity = 0.0;
-            }
+            var hitDistance = sweep.hitFraction * remainingLength;
+            if (hitDistance < 0.0) hitDistance = 0.0;
+            else if (hitDistance > remainingLength) hitDistance = remainingLength;
 
-            var fraction = hitDistance <= 0.0 ? 0.0 : hitDistance / remainingLength;
-            if (fraction > 1.0) fraction = 1.0;
+            movePosition.x += moveDirection.x * hitDistance;
+            movePosition.y += moveDirection.y * hitDistance;
+            movePosition.z += moveDirection.z * hitDistance;
 
-            movePosition.addf(
-                moveRemaining.x * fraction,
-                moveRemaining.y * fraction,
-                moveRemaining.z * fraction
-            );
-
-            // Leave a small gap so the next sweep does not start touching.
-            movePosition.addf(
-                moveNormal.x * MOVE_SKIN,
-                moveNormal.y * MOVE_SKIN,
-                moveNormal.z * MOVE_SKIN
-            );
-
-            moveRemaining.mult(1.0 - fraction);
-            var into = moveRemaining.dot(moveNormal);
+            var into = moveNormal.dot(moveDirection);
             if (into < 0.0) {
-                moveRemaining.addf(
-                    -moveNormal.x * into,
-                    -moveNormal.y * into,
-                    -moveNormal.z * into
+                movePosition.addf(
+                    moveNormal.x * CONTACT_CLEARANCE,
+                    moveNormal.y * CONTACT_CLEARANCE,
+                    moveNormal.z * CONTACT_CLEARANCE
                 );
+
+                rememberPlane();
+            }
+
+            if (upDot(moveNormal) < maxSlopeCos - SLOPE_EPSILON) stepBlocked = true;
+
+            moveRemaining.mult(1.0 - hitDistance / remainingLength);
+
+            for (i in 0...planeCount) {
+                var plane = planeNormals[i];
+                var along = moveRemaining.dot(plane);
+                if (along < 0.0) {
+                    moveRemaining.addf(
+                        -plane.x * along,
+                        -plane.y * along,
+                        -plane.z * along
+                    );
+                }
             }
             blockClimb(moveNormal);
+
+            if (moveRemaining.dot(walkDirection) <= 0.0) break;
+        }
+
+        var dx = movePosition.x - startX;
+        var dy = movePosition.y - startY;
+        var dz = movePosition.z - startZ;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    function rememberPlane() {
+        if (planeCount >= MAX_SLIDE_PLANES) return;
+
+        for (i in 0...planeCount) {
+            if (planeNormals[i].dot(moveNormal) > 0.999) return;
+        }
+
+        var plane = planeNormals[planeCount];
+        plane.set(moveNormal.x, moveNormal.y, moveNormal.z, 0.0);
+        planeCount++;
+    }
+
+    function blockClimb(normal: Vec4) {
+        if (upDot(normal) >= maxSlopeCos - SLOPE_EPSILON) return;
+        if (verticalVelocity > 0.0) return;
+
+        var uphill = upDot(moveRemaining);
+        if (uphill > 0.0) {
+            moveRemaining.addf(-up.x * uphill, -up.y * uphill, -up.z * uphill);
         }
     }
 
-    // On surfaces steeper than the slope limit, keep the slide but discard any
-    // uphill part so the character cannot climb vertical faces.
-    function blockClimb(normal: Vec4) {
-        if (normal.z >= maxSlopeCos) return;
-        if (verticalVelocity > 0.0) return;
-        if (moveRemaining.z > 0.0) moveRemaining.z = 0.0;
+    function sweepDown(drop: Float, ahead: Float): ConvexHit {
+        moveFrom.set(
+            movePosition.x + lastDirection.x * ahead,
+            movePosition.y + lastDirection.y * ahead,
+            movePosition.z + lastDirection.z * ahead,
+            1.0
+        );
+        moveTo.set(moveFrom.x, moveFrom.y, moveFrom.z, 1.0);
+        upShift(moveTo, -drop);
+
+        return physics.sweepBody(body, moveFrom, moveTo, tempIronQuat, group, mask, true, maxSlopeCos - SLOPE_EPSILON, up);
     }
 
-    function probeGround(maxDistance: Float): Bool {
-        if (maxDistance <= MOVE_EPSILON) return false;
+    function dropDown(distance: Float): Bool {
+        if (distance <= MOVE_EPSILON) return false;
 
-        var extension = sweepProbeExtension();
-        var totalProbe = MOVE_BACK_OFF + maxDistance + extension;
+        fallMotion.set(-up.x * distance, -up.y * distance, -up.z * distance, 0.0);
 
-        moveFrom.set(movePosition.x, movePosition.y, movePosition.z + MOVE_BACK_OFF, 1.0);
-        moveTo.set(movePosition.x, movePosition.y, movePosition.z + MOVE_BACK_OFF - totalProbe, 1.0);
+        var hit = false;
+        var iterations = 0;
+        while (iterations < MAX_FALL_ITERATIONS) {
+            iterations++;
 
-        var sweep = physics.sweepBody(body, moveFrom, moveTo, tempIronQuat, group, mask, true);
-        if (sweep == null) return false;
+            var remainingLength = fallMotion.length();
+            if (remainingLength <= MOVE_EPSILON) break;
 
-        var hitDistance = sweep.hitFraction * totalProbe - MOVE_BACK_OFF;
-        if (hitDistance > maxDistance) return false;
+            moveDirection.set(
+                fallMotion.x / remainingLength,
+                fallMotion.y / remainingLength,
+                fallMotion.z / remainingLength,
+                0.0
+            );
 
-        moveNormal.set(sweep.normal.x, sweep.normal.y, sweep.normal.z, 0.0);
-        if (moveNormal.length() <= MOVE_EPSILON) return false;
-        moveNormal.normalize();
+            moveFrom.set(movePosition.x, movePosition.y, movePosition.z, 1.0);
+            moveTo.set(
+                moveFrom.x + fallMotion.x,
+                moveFrom.y + fallMotion.y,
+                moveFrom.z + fallMotion.z,
+                1.0
+            );
 
-        if (moveNormal.z < maxSlopeCos) return false;
+            // Unfiltered: any surface ends the fall, walkable or not.
+            var sweep = physics.sweepBody(body, moveFrom, moveTo, tempIronQuat, group, mask, true);
+            if (sweep == null) {
+                movePosition.x += fallMotion.x;
+                movePosition.y += fallMotion.y;
+                movePosition.z += fallMotion.z;
+                break;
+            }
 
-        if (hitDistance < 0.0) hitDistance = 0.0;
+            hit = true;
+            moveNormal.set(sweep.normal.x, sweep.normal.y, sweep.normal.z, 0.0);
+            if (moveNormal.length() <= MOVE_EPSILON) break;
+            moveNormal.normalize();
+            fallNormal.set(moveNormal.x, moveNormal.y, moveNormal.z, 0.0);
 
-        movePosition.z -= hitDistance;
-        movePosition.addf(
-            moveNormal.x * MOVE_SKIN,
-            moveNormal.y * MOVE_SKIN,
-            moveNormal.z * MOVE_SKIN
-        );
-        return true;
+            var hitDistance = sweep.hitFraction * remainingLength;
+            if (hitDistance < 0.0) hitDistance = 0.0;
+            else if (hitDistance > remainingLength) hitDistance = remainingLength;
+            movePosition.addf(
+                moveDirection.x * hitDistance,
+                moveDirection.y * hitDistance,
+                moveDirection.z * hitDistance
+            );
+
+            var into = moveNormal.dot(moveDirection);
+            if (into < 0.0) {
+                movePosition.addf(
+                    moveNormal.x * CONTACT_CLEARANCE,
+                    moveNormal.y * CONTACT_CLEARANCE,
+                    moveNormal.z * CONTACT_CLEARANCE
+                );
+            }
+
+            fallMotion.mult(1.0 - hitDistance / remainingLength);
+            var along = fallMotion.dot(moveNormal);
+            if (along < 0.0) {
+                fallMotion.addf(
+                    -moveNormal.x * along,
+                    -moveNormal.y * along,
+                    -moveNormal.z * along
+                );
+            }
+            if (upDot(fallMotion) >= -MOVE_EPSILON) break;
+        }
+
+        return hit;
+    }
+
+    function stepDown(dt: Float, horizontalDistance: Float, steppedUp: Bool) {
+        if (verticalVelocity > 0.0) {
+            grounded = false;
+            return;
+        }
+
+        var wasGrounded = grounded;
+
+        var gravityDrop = -verticalVelocity * dt;
+        if (gravityDrop < 0.0) gravityDrop = 0.0;
+
+        var slopeDrop = horizontalDistance > 0.0 ? horizontalDistance * slopeTan : 0.0;
+        var snap = gravityDrop > slopeDrop ? gravityDrop : slopeDrop;
+        if (snap > stepHeight) snap = stepHeight;
+
+        var reach = currentStepOffset + snap + CONTACT_CLEARANCE;
+        if (!wasGrounded) reach = gravityDrop + CONTACT_CLEARANCE;
+
+        var sweep = sweepDown(reach, 0.0);
+        var supportDistance = sweep == null ? -1.0 : sweep.hitFraction * reach;
+
+        if (steppedUp || supportDistance < 0.0) {
+            var aheadSweep = sweepDown(reach, footRadius);
+            if (aheadSweep != null) {
+                var aheadDistance = aheadSweep.hitFraction * reach;
+                if (supportDistance < 0.0 || aheadDistance < supportDistance) supportDistance = aheadDistance;
+            }
+        }
+
+        if (supportDistance >= 0.0) {
+            var travel = supportDistance - CONTACT_CLEARANCE;
+            if (travel > 0.0) upShift(movePosition, -travel);
+
+            verticalVelocity = 0.0;
+            verticalOffset = 0.0;
+            grounded = true;
+        }
+        else {
+            var stopped = dropDown(currentStepOffset + gravityDrop);
+            if (stopped && upDot(fallNormal) >= maxSlopeCos - SLOPE_EPSILON) {
+                // A walkable surface ended the fall even though the ground probe
+                // missed it (an edge-on triangle, or a dropped cast): land on it
+                // instead of falling through it.
+                verticalVelocity = 0.0;
+                verticalOffset = 0.0;
+                grounded = true;
+            }
+            else {
+                grounded = false;
+            }
+        }
+
+        currentStepOffset = 0.0;
     }
 
     public function canJump(): Bool {
-        return grounded;
+        return onGround();
     }
 
     public function onGround(): Bool {
@@ -498,6 +737,7 @@ class KinematicCharacterController extends iron.Trait {
 
     public function setJumpSpeed(speed: Float) {
         jumpSpeed = speed > 0.0 ? speed : 0.0;
+        defaultJumpSpeed = jumpSpeed;
     }
 
     public function setFallSpeed(speed: Float) {
@@ -509,6 +749,7 @@ class KinematicCharacterController extends iron.Trait {
         else if (angleRadians > Math.PI / 2) angleRadians = Math.PI / 2;
         maxSlope = angleRadians;
         maxSlopeCos = Math.cos(angleRadians);
+        slopeTan = Math.tan(angleRadians > 1.5 ? 1.5 : angleRadians);
     }
 
     public function getMaxSlope(): Float {
@@ -516,7 +757,7 @@ class KinematicCharacterController extends iron.Trait {
     }
 
     public function setMaxJumpHeight(height: Float) {
-        if (gravity > 0.0) jumpSpeed = Math.sqrt(2.0 * gravity * height);
+        maxJumpHeight = height;
     }
 
     public function setWalkDirection(direction: Vec4) {
@@ -532,11 +773,20 @@ class KinematicCharacterController extends iron.Trait {
         upInterpolate = value;
     }
 
-    public function jump() {
+    public function jump(v: Vec4 = null) {
         if (!ready || body == null) return;
 
+        if (v == null || v.x * v.x + v.y * v.y + v.z * v.z <= MOVE_EPSILON) {
+            jumpSpeed = defaultJumpSpeed;
+            jumpAxis.set(up.x, up.y, up.z, 0.0);
+        }
+        else {
+            jumpSpeed = v.length();
+            jumpAxis.set(v.x, v.y, v.z, 0.0);
+            jumpAxis.normalize();
+        }
+
         verticalVelocity = jumpSpeed;
-        grounded = false;
         body.wakeUp();
     }
 
@@ -572,11 +822,13 @@ class KinematicCharacterController extends iron.Trait {
     }
 
     public function disableGravity() {
-        gravityEnabled = false;
+        gravity = 0.0;
     }
 
     public function enableGravity() {
-        gravityEnabled = true;
+        if (physics == null) return;
+        // Armory's Bullet wrapper uses three times the world gravity.
+        gravity = Math.abs(upDot(physics.getGravity())) * 3.0;
     }
 
     public function setGravity(value: Float) {

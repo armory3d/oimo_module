@@ -71,6 +71,7 @@ class PhysicsWorld extends Trait {
 	public var world: oimo.dynamics.World;
 	public var rbMap: Map<Int, RigidBody>;
 	public var charMap: Map<Int, KinematicCharacterController>;
+	var characterList: Array<KinematicCharacterController> = [];
 	public var timeScale: Float = 1.0;
 	var preUpdates: Array<Void->Void> = null;
 	public var hitPointWorld = new Vec4();
@@ -102,10 +103,8 @@ class PhysicsWorld extends Trait {
 		}
 		else {
 			for (rb in active.rbMap) { @:privateAccess try { active.removeRigidBody(rb); } catch(e: haxe.Exception) { trace(e.message); } }
-			if (active.charMap != null) {
-				var characters: Array<KinematicCharacterController> = [for (c in active.charMap) c];
-				for (c in characters) { @:privateAccess try { active.removeKinematicCharacterController(c); } catch(e: haxe.Exception) { trace(e.message); } }
-			}
+			var characters: Array<KinematicCharacterController> = [for (c in active.charMap) c];
+			for (c in characters) { @:privateAccess try { active.removeKinematicCharacterController(c); } catch(e: haxe.Exception) { trace(e.message); } }
 			this.world = active.world;
 		}
 
@@ -131,7 +130,7 @@ class PhysicsWorld extends Trait {
 		for (rb in bodies) { @:privateAccess try { active.removeRigidBody(rb); } catch(e: haxe.Exception) { trace(e.message); } }
 
 		var characters: Array<KinematicCharacterController> = [];
-		if (active.charMap != null) for (c in active.charMap) characters.push(c);
+		for (c in active.charMap) characters.push(c);
 		for (c in characters) { @:privateAccess try { active.removeKinematicCharacterController(c); } catch(e: haxe.Exception) { trace(e.message); } }
 
 		contacts.resize(0);
@@ -182,7 +181,7 @@ class PhysicsWorld extends Trait {
 	public function removeKinematicCharacterController(controller: KinematicCharacterController) {
 		if (controller == null) return;
 
-		if (charMap != null) charMap.remove(controller.id);
+		charMap.remove(controller.id);
 
 		if (world != null && controller.body != null && controller.body._world == world) world.removeRigidBody(controller.body);
 	}
@@ -195,7 +194,17 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function findCharacter(id: Int): KinematicCharacterController {
-		return charMap != null ? charMap.get(id) : null;
+		return charMap.get(id);
+	}
+
+	inline function characterOf(body: oimo.dynamics.rigidbody.RigidBody): KinematicCharacterController {
+		var ud = body != null ? body.userData : null;
+		return Std.isOfType(ud, KinematicCharacterController) ? cast ud : null;
+	}
+
+	inline function rigidBodyOf(body: oimo.dynamics.rigidbody.RigidBody): RigidBody {
+		var ud = body != null ? body.userData : null;
+		return Std.isOfType(ud, RigidBody) ? cast ud : null;
 	}
 
 	public function getOverlappingBodies(character: KinematicCharacterController): Array<RigidBody> {
@@ -206,11 +215,8 @@ class PhysicsWorld extends Trait {
 		while (contact != null) {
 			if (contact._touching && (contact._b1 == character.body || contact._b2 == character.body)) {
 				var other = contact._b1 == character.body ? contact._b2 : contact._b1;
-				var ud = other != null ? other.userData : null;
-				if (Std.isOfType(ud, RigidBody)) {
-					var rb: RigidBody = cast ud;
-					if (res.indexOf(rb) == -1) res.push(rb);
-				}
+				var rb = rigidBodyOf(other);
+				if (rb != null && res.indexOf(rb) == -1) res.push(rb);
 			}
 			contact = contact.getNext();
 		}
@@ -244,8 +250,8 @@ class PhysicsWorld extends Trait {
 
 	// TODO
 	public function findBody(id: Int): RigidBody {
-		trace("TODO");
-		return null;
+		var rb = rbMap.get(id);
+		return rb;
 	}
 
 	public function fixedUpdate() {
@@ -260,10 +266,10 @@ class PhysicsWorld extends Trait {
 
 		if (preUpdates != null) for (f in preUpdates) f();
 
-		if (charMap != null) {
-			var characters: Array<KinematicCharacterController> = [for (c in charMap) c];
-			for (c in characters) c.fixedUpdate(Time.fixedStep * ts);
-		}
+		// Copy first: a character may remove itself from charMap while stepping.
+		characterList.resize(0);
+		for (c in charMap) characterList.push(c);
+		for (c in characterList) c.fixedUpdate(Time.fixedStep * ts);
 
 		world.step(Time.fixedStep * ts);
 		updateContacts();
@@ -325,9 +331,9 @@ class PhysicsWorld extends Trait {
 		world.rayCast(new Vec3(from.x, from.y, from.z), new Vec3(to.x, to.y, to.z), rayCastResult);
 
 		if (rayCastResult.hit) {
-			var ud = rayCastResult.shape._rigidBody.userData;
-			var character: KinematicCharacterController = Std.isOfType(ud, KinematicCharacterController) ? cast ud : null;
-			var rb: RigidBody = (character == null && Std.isOfType(ud, RigidBody)) ? cast ud : null;
+			var targetBody = rayCastResult.shape._rigidBody;
+			var character = characterOf(targetBody);
+			var rb = rigidBodyOf(targetBody);
 			hitPointWorld.set(rayCastResult.position.x, rayCastResult.position.y, rayCastResult.position.z);
 			hitNormalWorld.set(rayCastResult.normal.x, rayCastResult.normal.y, rayCastResult.normal.z);
 			hitInfo = new Hit(rb, hitPointWorld, hitNormalWorld, character);
@@ -352,10 +358,10 @@ class PhysicsWorld extends Trait {
 	}
 
 	@:allow(armory.trait.physics.oimo)
-	function sweepBody(body: oimo.dynamics.rigidbody.RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int, mask: Int, ignoreTriggers: Bool): ConvexHit {
+	function sweepBody(body: oimo.dynamics.rigidbody.RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int, mask: Int, ignoreTriggers: Bool, minNormalUp: Float = -2.0, up: Vec4 = null): ConvexHit {
 		var convex = prepareConvexQueryForBody(body, from, rotation);
 		if (convex == null || to == null) return null;
-		return sweepPrepared(convex, from, to, group, mask, body, ignoreTriggers);
+		return sweepPrepared(convex, from, to, group, mask, body, ignoreTriggers, minNormalUp, up);
 	}
 
 	public function convexSweepTest(rb: RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): ConvexHit {
@@ -434,16 +440,15 @@ class PhysicsWorld extends Trait {
 		if (!overlapCollector.hit) return null;
 
 		var targetBody = overlapCollector.shape._rigidBody;
-		var ud = targetBody != null ? targetBody.userData : null;
-		var character: KinematicCharacterController = Std.isOfType(ud, KinematicCharacterController) ? cast ud : null;
-		var hitRb: RigidBody = (character == null && Std.isOfType(ud, RigidBody)) ? cast ud : null;
+		var character = characterOf(targetBody);
+		var hitRb = rigidBodyOf(targetBody);
 
 		convexHitPointWorld.set(overlapCollector.position.x, overlapCollector.position.y, overlapCollector.position.z);
 		convexHitNormalWorld.set(overlapCollector.normal.x, overlapCollector.normal.y, overlapCollector.normal.z);
 		return new ConvexHit(convexHitPointWorld, convexHitNormalWorld, 0, hitRb, character, overlapCollector.depth, true);
 	}
 
-	function sweepPrepared(convex: ConvexGeometry, from: Vec4, to: Vec4, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody, ignoreTriggers: Bool = false): ConvexHit {
+	function sweepPrepared(convex: ConvexGeometry, from: Vec4, to: Vec4, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody, ignoreTriggers: Bool = false, minNormalUp: Float = -2.0, up: Vec4 = null): ConvexHit {
 		if (to == null) return null;
 
 		sweepTranslation.init(to.x - from.x, to.y - from.y, to.z - from.z);
@@ -453,6 +458,17 @@ class PhysicsWorld extends Trait {
 		convexCastResult.mask = mask;
 		convexCastResult.ignoreBody = ignoreBody;
 		convexCastResult.ignoreTriggers = ignoreTriggers;
+		convexCastResult.minNormalUp = minNormalUp;
+		if (up != null) {
+			convexCastResult.upX = up.x;
+			convexCastResult.upY = up.y;
+			convexCastResult.upZ = up.z;
+		}
+		else {
+			convexCastResult.upX = 0.0;
+			convexCastResult.upY = 0.0;
+			convexCastResult.upZ = 0.0;
+		}
 
 		world.convexCast(convex, sweepTransform, sweepTranslation, convexCastResult);
 
@@ -461,9 +477,8 @@ class PhysicsWorld extends Trait {
 		convexCastResult.normal.negateEq();
 
 		var targetBody = convexCastResult.shape._rigidBody;
-		var ud = targetBody != null ? targetBody.userData : null;
-		var character: KinematicCharacterController = Std.isOfType(ud, KinematicCharacterController) ? cast ud : null;
-		var hitRb: RigidBody = (character == null && Std.isOfType(ud, RigidBody)) ? cast ud : null;
+		var character = characterOf(targetBody);
+		var hitRb = rigidBodyOf(targetBody);
 
 		convexHitPointWorld.set(convexCastResult.position.x, convexCastResult.position.y, convexCastResult.position.z);
 		convexHitNormalWorld.set(convexCastResult.normal.x, convexCastResult.normal.y, convexCastResult.normal.z);
@@ -526,6 +541,12 @@ private class CastClosestWithMask extends RayCastClosest {
     public var mask: Int;
     public var ignoreBody: oimo.dynamics.rigidbody.RigidBody = null;
     public var ignoreTriggers: Bool = false;
+    public var minNormalUp: Float = -2.0;
+    public var upX: Float = 0.0;
+    public var upY: Float = 0.0;
+    public var upZ: Float = 0.0;
+
+    static inline var NORMAL_UP_EPSILON: Float = 0.0001;
 
     public function new(group: Int = 0x00000001, mask: Int = 0xFFFFFFFF) {
         super();
@@ -536,7 +557,13 @@ private class CastClosestWithMask extends RayCastClosest {
 	override public function process(shape: Shape, hit: RayCastHit): Void {
 		if (ignoreBody != null && shape._rigidBody == ignoreBody) return;
 		if (ignoreTriggers && shape._isTrigger) return;
-		if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) super.process(shape, hit);
+		if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) {
+			if (minNormalUp > -1.5 && upX * upX + upY * upY + upZ * upZ > 0.5) {
+				var upDot = -(upX * hit.normal.x + upY * hit.normal.y + upZ * hit.normal.z);
+				if (upDot < minNormalUp - NORMAL_UP_EPSILON) return;
+			}
+			super.process(shape, hit);
+		}
 	}
 }
 
