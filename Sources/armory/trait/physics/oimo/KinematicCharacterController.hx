@@ -66,6 +66,7 @@ class KinematicCharacterController extends iron.Trait {
     var moveNormal: Vec4 = new Vec4();
     var moveFrom: Vec4 = new Vec4();
     var moveTo: Vec4 = new Vec4();
+    var probePosition: Vec4 = new Vec4();
 
     var planeNormals: Array<Vec4> = [new Vec4(), new Vec4(), new Vec4()];
     var planeCount: Int = 0;
@@ -357,7 +358,6 @@ class KinematicCharacterController extends iron.Trait {
         }
         else {
             var walked = stepForwardAndStrafe();
-            // part of the walk direction, not its full length.
             var walkLength = horizontalLength(walkDirection);
             var steppedUp = false;
 
@@ -371,7 +371,7 @@ class KinematicCharacterController extends iron.Trait {
 
                 if (rise > MOVE_EPSILON) {
                     var stepped = stepForwardAndStrafe();
-                    if (stepped > walked + MOVE_EPSILON) {
+                    if (stepped >= walkLength - MOVE_EPSILON) {
                         currentStepOffset = rise;
                         steppedUp = true;
                     }
@@ -452,6 +452,7 @@ class KinematicCharacterController extends iron.Trait {
             moveNormal.normalize();
 
             var push = overlap.depth + CONTACT_CLEARANCE;
+            push *= flattenContact();
             movePosition.addf(moveNormal.x * push, moveNormal.y * push, moveNormal.z * push);
         }
 
@@ -513,29 +514,27 @@ class KinematicCharacterController extends iron.Trait {
             moveNormal.set(sweep.normal.x, sweep.normal.y, sweep.normal.z, 0.0);
             if (moveNormal.length() <= MOVE_EPSILON) break;
             moveNormal.normalize();
+            flattenContact();
 
             var hitDistance = sweep.hitFraction * remainingLength;
             if (hitDistance < 0.0) hitDistance = 0.0;
             else if (hitDistance > remainingLength) hitDistance = remainingLength;
 
-            movePosition.x += moveDirection.x * hitDistance;
-            movePosition.y += moveDirection.y * hitDistance;
-            movePosition.z += moveDirection.z * hitDistance;
-
             var into = moveNormal.dot(moveDirection);
+            var advance = hitDistance;
             if (into < 0.0) {
-                movePosition.addf(
-                    moveNormal.x * CONTACT_CLEARANCE,
-                    moveNormal.y * CONTACT_CLEARANCE,
-                    moveNormal.z * CONTACT_CLEARANCE
-                );
-
+                advance -= CONTACT_CLEARANCE;
+                if (advance < 0.0) advance = 0.0;
                 rememberPlane();
             }
 
+            movePosition.x += moveDirection.x * advance;
+            movePosition.y += moveDirection.y * advance;
+            movePosition.z += moveDirection.z * advance;
+
             if (upDot(moveNormal) < maxSlopeCos - SLOPE_EPSILON) stepBlocked = true;
 
-            moveRemaining.mult(1.0 - hitDistance / remainingLength);
+            moveRemaining.mult(1.0 - advance / remainingLength);
 
             for (i in 0...planeCount) {
                 var plane = planeNormals[i];
@@ -557,6 +556,23 @@ class KinematicCharacterController extends iron.Trait {
         var dy = movePosition.y - startY;
         var dz = movePosition.z - startZ;
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    function flattenContact(): Float {
+        var nup = upDot(moveNormal);
+        if (nup >= maxSlopeCos - SLOPE_EPSILON) return 1.0;
+
+        var hl = horizontalLength(moveNormal);
+        if (hl <= 0.1) return 1.0;
+
+        var s = 1.0 / hl;
+        moveNormal.set(
+            (moveNormal.x - up.x * nup) * s,
+            (moveNormal.y - up.y * nup) * s,
+            (moveNormal.z - up.z * nup) * s,
+            0.0
+        );
+        return s;
     }
 
     function rememberPlane() {
@@ -670,6 +686,18 @@ class KinematicCharacterController extends iron.Trait {
         return hit;
     }
 
+    function frontProbeClear(): Bool {
+        probePosition.set(
+            movePosition.x + lastDirection.x * footRadius,
+            movePosition.y + lastDirection.y * footRadius,
+            movePosition.z + lastDirection.z * footRadius,
+            1.0
+        );
+
+        var overlap = physics.overlapBody(body, probePosition, tempIronQuat, group, mask, true);
+        return overlap == null || overlap.depth <= CONTACT_CLEARANCE;
+    }
+
     function stepDown(dt: Float, horizontalDistance: Float, steppedUp: Bool) {
         if (verticalVelocity > 0.0) {
             grounded = false;
@@ -692,7 +720,7 @@ class KinematicCharacterController extends iron.Trait {
         var supportDistance = sweep == null ? -1.0 : sweep.hitFraction * reach;
 
         if (steppedUp || supportDistance < 0.0) {
-            var aheadSweep = sweepDown(reach, footRadius);
+            var aheadSweep = frontProbeClear() ? sweepDown(reach, footRadius) : null;
             if (aheadSweep != null) {
                 var aheadDistance = aheadSweep.hitFraction * reach;
                 if (supportDistance < 0.0 || aheadDistance < supportDistance) supportDistance = aheadDistance;
