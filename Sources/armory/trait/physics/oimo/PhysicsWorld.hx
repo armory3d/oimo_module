@@ -93,6 +93,9 @@ class PhysicsWorld extends Trait {
 	var sweepFrom: Vec3 = null;
 	var overlapCollector: ConvexOverlapCollector = null;
 
+	@:allow(armory.trait.physics.oimo)
+	var characterQueries: CharacterQueries = null;
+
 	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, fixedStep = 1 / 60, debugDrawMode: DebugDrawMode = NoDebug) {
 		super();
 
@@ -116,6 +119,7 @@ class PhysicsWorld extends Trait {
 		rayCastResult = new CastClosestWithMask();
 		convexCastResult = new CastClosestWithMask();
 		overlapCollector = new ConvexOverlapCollector();
+		characterQueries = new CharacterQueries(world);
 		contacts = [];
 
 		_fixedUpdate = [fixedUpdate];
@@ -213,18 +217,9 @@ class PhysicsWorld extends Trait {
 	}
 
 	public function getOverlappingBodies(character: KinematicCharacterController): Array<RigidBody> {
-		if (character == null || world == null || character.body == null) return null;
-
+		if (character == null || character.body == null || character.shape == null) return null;
 		var res: Array<RigidBody> = [];
-		var contact = world.getContactManager().getContactList();
-		while (contact != null) {
-			if (contact._touching && (contact._b1 == character.body || contact._b2 == character.body)) {
-				var other = contact._b1 == character.body ? contact._b2 : contact._b1;
-				var rb = rigidBodyOf(other);
-				if (rb != null && res.indexOf(rb) == -1) res.push(rb);
-			}
-			contact = contact.getNext();
-		}
+		characterQueries.overlappingBodies(character, res);
 		return res;
 	}
 
@@ -293,7 +288,7 @@ class PhysicsWorld extends Trait {
 			var ud1 = contact_list._b1 != null ? contact_list._b1.userData : null;
 			var ud2 = contact_list._b2 != null ? contact_list._b2.userData : null;
 
-			// Characters use a trigger body and are not part of rbMap.
+			// Characters are not part of rbMap.
 			if (Std.isOfType(ud1, RigidBody) && Std.isOfType(ud2, RigidBody)) {
 				var b1: RigidBody = cast ud1;
 				var b2: RigidBody = cast ud2;
@@ -353,20 +348,6 @@ class PhysicsWorld extends Trait {
 		});
 
 		return hitInfo;
-	}
-
-	@:allow(armory.trait.physics.oimo)
-	function overlapBody(body: oimo.dynamics.rigidbody.RigidBody, position: Vec4, rotation: Quat, group: Int, mask: Int, ignoreTriggers: Bool): ConvexHit {
-		var convex = prepareConvexQueryForBody(body, position, rotation);
-		if (convex == null) return null;
-		return overlapPrepared(convex, group, mask, body, ignoreTriggers);
-	}
-
-	@:allow(armory.trait.physics.oimo)
-	function sweepBody(body: oimo.dynamics.rigidbody.RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int, mask: Int, ignoreTriggers: Bool, minNormalUp: Float = -2.0, up: Vec4 = null): ConvexHit {
-		var convex = prepareConvexQueryForBody(body, from, rotation);
-		if (convex == null || to == null) return null;
-		return sweepPrepared(convex, from, to, group, mask, body, ignoreTriggers, minNormalUp, up);
 	}
 
 	public function convexSweepTest(rb: RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): ConvexHit {
@@ -431,12 +412,11 @@ class PhysicsWorld extends Trait {
 		return convex;
 	}
 
-	function overlapPrepared(convex: ConvexGeometry, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody, ignoreTriggers: Bool = false): ConvexHit {
+	function overlapPrepared(convex: ConvexGeometry, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody): ConvexHit {
 		overlapCollector.clear();
 		overlapCollector.group = group;
 		overlapCollector.mask = mask;
 		overlapCollector.ignoreBody = ignoreBody;
-		overlapCollector.ignoreTriggers = ignoreTriggers;
 
 		world.convexOverlap(convex, sweepTransform, overlapCollector);
 
@@ -451,7 +431,7 @@ class PhysicsWorld extends Trait {
 		return new ConvexHit(convexHitPointWorld, convexHitNormalWorld, 0, hitRb, character, overlapCollector.depth, true);
 	}
 
-	function sweepPrepared(convex: ConvexGeometry, from: Vec4, to: Vec4, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody, ignoreTriggers: Bool = false, minNormalUp: Float = -2.0, up: Vec4 = null): ConvexHit {
+	function sweepPrepared(convex: ConvexGeometry, from: Vec4, to: Vec4, group: Int, mask: Int, ignoreBody: oimo.dynamics.rigidbody.RigidBody): ConvexHit {
 		if (to == null) return null;
 
 		sweepTranslation.init(to.x - from.x, to.y - from.y, to.z - from.z);
@@ -460,18 +440,6 @@ class PhysicsWorld extends Trait {
 		convexCastResult.group = group;
 		convexCastResult.mask = mask;
 		convexCastResult.ignoreBody = ignoreBody;
-		convexCastResult.ignoreTriggers = ignoreTriggers;
-		convexCastResult.minNormalUp = minNormalUp;
-		if (up != null) {
-			convexCastResult.upX = up.x;
-			convexCastResult.upY = up.y;
-			convexCastResult.upZ = up.z;
-		}
-		else {
-			convexCastResult.upX = 0.0;
-			convexCastResult.upY = 0.0;
-			convexCastResult.upZ = 0.0;
-		}
 
 		world.convexCast(convex, sweepTransform, sweepTranslation, convexCastResult);
 
@@ -538,31 +506,19 @@ class PhysicsWorld extends Trait {
 }
 
 private class CastClosestWithMask extends RayCastClosest {
-    public var group: Int;
-    public var mask: Int;
-    public var ignoreBody: oimo.dynamics.rigidbody.RigidBody = null;
-    public var ignoreTriggers: Bool = false;
-    public var minNormalUp: Float = -2.0;
-    public var upX: Float = 0.0;
-    public var upY: Float = 0.0;
-    public var upZ: Float = 0.0;
+	public var group: Int;
+	public var mask: Int;
+	public var ignoreBody: oimo.dynamics.rigidbody.RigidBody = null;
 
-    static inline var NORMAL_UP_EPSILON: Float = 0.0001;
-
-    public function new(group: Int = 0x00000001, mask: Int = 0xFFFFFFFF) {
-        super();
-        this.group = group;
-        this.mask = mask;
+	public function new(group: Int = 0x00000001, mask: Int = 0xFFFFFFFF) {
+		super();
+		this.group = group;
+		this.mask = mask;
 	}
 
 	override public function process(shape: Shape, hit: RayCastHit): Void {
 		if (ignoreBody != null && shape._rigidBody == ignoreBody) return;
-		if (ignoreTriggers && shape._isTrigger) return;
 		if ((mask & shape.getCollisionGroup() != 0) && (shape.getCollisionMask() & group != 0)) {
-			if (minNormalUp > -1.5 && upX * upX + upY * upY + upZ * upZ > 0.5) {
-				var upDot = -(upX * hit.normal.x + upY * hit.normal.y + upZ * hit.normal.z);
-				if (upDot < minNormalUp - NORMAL_UP_EPSILON) return;
-			}
 			super.process(shape, hit);
 		}
 	}
