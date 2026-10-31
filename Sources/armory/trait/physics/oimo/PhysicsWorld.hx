@@ -353,7 +353,7 @@ class PhysicsWorld extends Trait {
 	public function convexSweepTest(rb: RigidBody, from: Vec4, to: Vec4, rotation: Quat, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): ConvexHit {
 		var convex = prepareConvexQuery(rb, from, rotation);
 		if (convex == null || to == null) return null;
-		return sweepPrepared(convex, from, to, group, mask, null);
+		return sweepPrepared(convex, from, to, group, mask, rb.body);
 	}
 
 	public function convexOverlapTest(rb: RigidBody, position: Vec4, rotation: Quat, group: Int = 0x00000001, mask: Int = 0xFFFFFFFF): ConvexHit {
