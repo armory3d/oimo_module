@@ -64,6 +64,7 @@ class CharacterQueries {
 	function sweep(body: OimoBody, from: Vec4, to: Vec4, orientation: Quat, group: Int, mask: Int, axis: Vec4, minDot: Float, up: Vec4, out: CharacterSweep): Bool {
 		out.hit = false;
 		out.fraction = 1.0;
+		out.body = null;
 		var convex = placeShape(body, from, orientation);
 		if (convex == null) return false;
 
@@ -81,6 +82,7 @@ class CharacterQueries {
 		out.position.set(cb.position.x, cb.position.y, cb.position.z, 1.0);
 		out.normal.set(cb.normal.x, cb.normal.y, cb.normal.z, 0.0);
 		out.faceNormal.set(cb.faceNormal.x, cb.faceNormal.y, cb.faceNormal.z, 0.0);
+		out.body = cb.body;
 		return true;
 	}
 
@@ -146,6 +148,7 @@ class CharacterSweep {
 	public var normal: Vec4 = new Vec4();
 	/** The hit triangle's face normal turned towards the swept shape; the contact normal for other shapes. **/
 	public var faceNormal: Vec4 = new Vec4();
+	public var body: OimoBody = null;
 
 	public function new() {}
 }
@@ -161,6 +164,7 @@ class CharacterContacts {
 	/** Push-out directions, pointing towards the character. **/
 	public var normals: Array<Vec4> = [for (i in 0...CAPACITY) new Vec4()];
 	public var depths: Array<Float> = [for (i in 0...CAPACITY) 0.0];
+	public var bodies: Array<OimoBody> = [for (i in 0...CAPACITY) null];
 
 	public function new() {}
 }
@@ -180,6 +184,7 @@ private class SweepCallback extends RayCastCallback {
 	public var position = new Vec3();
 	public var normal = new Vec3();
 	public var faceNormal = new Vec3();
+	public var body: OimoBody = null;
 
 	var group: Int = 1;
 	var mask: Int = 1;
@@ -204,6 +209,7 @@ private class SweepCallback extends RayCastCallback {
 	public function reset(group: Int, mask: Int, ignoreBody: OimoBody, axis: Vec4, minDot: Float, up: Vec4, tieFraction: Float) {
 		hit = false;
 		fraction = 1.0;
+		body = null;
 		this.group = group;
 		this.mask = mask;
 		this.ignoreBody = ignoreBody;
@@ -253,6 +259,7 @@ private class SweepCallback extends RayCastCallback {
 		position.copyFrom(hit.position);
 		normal.init(nx, ny, nz);
 		faceNormal.copyFrom(face);
+		body = shape._rigidBody;
 	}
 }
 
@@ -303,6 +310,7 @@ private class ContactCollector extends ConvexOverlapCallback {
 		}
 		contacts.normals[index].set(n.x * invLength, n.y * invLength, n.z * invLength, 0.0);
 		contacts.depths[index] = depth;
+		contacts.bodies[index] = shape._rigidBody;
 	}
 }
 

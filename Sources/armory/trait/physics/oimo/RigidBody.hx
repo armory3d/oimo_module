@@ -62,6 +62,7 @@ class RigidBody extends Trait {
 
 	public var onReady: Void->Void = null;
 	public var onContact: Array<RigidBody->Void> = null;
+	public var onCharacterContact: Array<KinematicCharacterController->Void> = null;
 	public var heightData: haxe.io.Bytes = null;
 
 	// Compound shape children (baked from exporter)
@@ -446,6 +447,10 @@ class RigidBody extends Trait {
 			var rbs: Array<RigidBody> = physics.getContacts(this);
 			if (rbs != null) for (rb in rbs) for (f in onContact) f(rb);
 		}
+
+		if (onCharacterContact != null) {
+			for (c in physics.getCharacterContacts(this)) for (f in onCharacterContact) f(c);
+		}
 	}
 
 	public function disableCollision() {
@@ -616,6 +621,15 @@ class RigidBody extends Trait {
 
 	public function removeContact(f: RigidBody->Void) {
 		onContact.remove(f);
+	}
+
+	public function notifyOnCharacterContact(f: KinematicCharacterController->Void) {
+		if (onCharacterContact == null) onCharacterContact = [];
+		onCharacterContact.push(f);
+	}
+
+	public function removeCharacterContact(f: KinematicCharacterController->Void) {
+		if (onCharacterContact != null) onCharacterContact.remove(f);
 	}
 
 	public function setScale(v: Vec4) {

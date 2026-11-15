@@ -26,6 +26,7 @@ import oimo.dynamics.rigidbody.ShapeConfig;
 class KinematicCharacterController extends iron.Trait {
 	public var ready: Bool = false;
 	public var onReady: Void->Void = null;
+	public var onContact: Array<RigidBody->Void> = null;
 
 	public var id: Int = 0;
 	public var physics: PhysicsWorld = null;
@@ -91,6 +92,9 @@ class KinematicCharacterController extends iron.Trait {
 	var slideLanded: Bool = false;
 	var slideStepCandidate: Bool = false;
 	var slideWallNormal: Vec4 = new Vec4();
+
+	// Bodies touched this step: the surfaces the moves stopped at, plus the world's contacts
+	var touching: Array<RigidBody> = [];
 
 	// Scratch
 	var sweep: CharacterSweep = new CharacterSweep();
@@ -343,6 +347,7 @@ class KinematicCharacterController extends iron.Trait {
 	}
 
 	public function fixedUpdate(dt: Float) {
+		touching.resize(0);
 		if (!ready || body == null || physics == null || transform == null) return;
 
 		body.getPositionTo(tempPos);
@@ -382,6 +387,7 @@ class KinematicCharacterController extends iron.Trait {
 
 			push.set(0.0, 0.0, 0.0, 0.0);
 			for (i in 0...count) {
+				touchBody(contacts.bodies[i]);
 				var depth = contacts.depths[i];
 				if (depth <= RECOVER_SLOP) continue;
 				var n = contacts.normals[i];
@@ -412,7 +418,12 @@ class KinematicCharacterController extends iron.Trait {
 
 		if (onGround && slideStepCandidate) {
 			walkEnd.setFrom(position);
-			if (!stepUp(length)) position.setFrom(walkEnd);
+			var touched = touching.length;
+			if (!stepUp(length)) {
+				position.setFrom(walkEnd);
+				// The failed step's surfaces weren't reached
+				touching.resize(touched);
+			}
 		}
 	}
 
@@ -427,7 +438,11 @@ class KinematicCharacterController extends iron.Trait {
 		position.setFrom(walkStart);
 		var lift = stepHeight + SKIN * 2.0;
 		offsetUp(target, lift);
-		var raised = sweepTo(target) ? sweep.fraction * lift - SKIN : lift;
+		var raised = lift;
+		if (sweepTo(target)) {
+			raised = sweep.fraction * lift - SKIN;
+			touchBody(sweep.body);
+		}
 		if (raised < MIN_MOVE) return false;
 		moveUp(raised);
 
@@ -443,6 +458,7 @@ class KinematicCharacterController extends iron.Trait {
 		var drop = sweep.fraction * reach - SKIN;
 		if (raised - drop < SKIN) return false;
 		if (drop > 0.0) moveUp(-drop);
+		touchBody(sweep.body);
 		return true;
 	}
 
@@ -471,6 +487,7 @@ class KinematicCharacterController extends iron.Trait {
 		if (!sweepTo(target)) return false;
 
 		var firstDistance = sweep.fraction * reach;
+		var surface = sweep.body;
 		if (!isWalkable(sweep.faceNormal)) {
 			// The first surface below is too steep. Walkable ground right past it still holds the
 			// character (standing against a wall or the foot of a steep slope); ground further
@@ -481,6 +498,7 @@ class KinematicCharacterController extends iron.Trait {
 
 		var drop = firstDistance - SKIN;
 		if (drop > 0.0) moveUp(-drop);
+		touchBody(surface);
 		return true;
 	}
 
@@ -504,6 +522,7 @@ class KinematicCharacterController extends iron.Trait {
 				break;
 			}
 
+			touchBody(sweep.body);
 			var dx = motion.x / length;
 			var dy = motion.y / length;
 			var dz = motion.z / length;
@@ -613,6 +632,34 @@ class KinematicCharacterController extends iron.Trait {
 		return up.dot(n) >= maxSlopeCos - SLOPE_EPSILON;
 	}
 
+	// Other characters aren't reported.
+	function touchBody(b: oimo.dynamics.rigidbody.RigidBody) {
+		var ud = b != null ? b.userData : null;
+		if (Std.isOfType(ud, RigidBody)) touch(cast ud);
+	}
+
+	function touch(rb: RigidBody) {
+		if (touching.indexOf(rb) == -1) touching.push(rb);
+	}
+
+	function reportContacts() {
+		if (onContact == null) return;
+		for (rb in touching) for (f in onContact) f(rb);
+	}
+
+	public function notifyOnContact(f: RigidBody->Void) {
+		if (onContact == null) onContact = [];
+		onContact.push(f);
+	}
+
+	public function removeContact(f: RigidBody->Void) {
+		if (onContact != null) onContact.remove(f);
+	}
+
+	public function getContacts(): Array<RigidBody> {
+		return touching.copy();
+	}
+
 	public function canJump(): Bool {
 		return onGround();
 	}
@@ -666,6 +713,7 @@ class KinematicCharacterController extends iron.Trait {
 		body = null;
 		shape = null;
 		ready = false;
+		touching.resize(0);
 	}
 
 	public function setGroup(group: Int) {

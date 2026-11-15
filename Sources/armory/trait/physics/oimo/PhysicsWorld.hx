@@ -238,6 +238,12 @@ class PhysicsWorld extends Trait {
 		return res;
 	}
 
+	public function getCharacterContacts(body: RigidBody): Array<KinematicCharacterController> {
+		var res: Array<KinematicCharacterController> = [];
+		for (c in charMap) if (@:privateAccess c.touching.indexOf(body) != -1) res.push(c);
+		return res;
+	}
+
 	public function getContactPairs(body: RigidBody): Array<ContactPair> {
 		if (contacts.length == 0) return null;
 		var res: Array<ContactPair> = [];
@@ -275,6 +281,9 @@ class PhysicsWorld extends Trait {
 		copyValues(rbMap, bodyList);
 		for (rb in bodyList) if (rbMap.exists(rb.id)) @:privateAccess rb.physicsUpdate();
 
+		copyValues(charMap, characterList);
+		for (c in characterList) if (charMap.exists(c.id)) @:privateAccess c.reportContacts();
+
 		#if arm_debug
 		physTime = kha.Scheduler.realTime() - startTime;
 		#end
@@ -288,7 +297,16 @@ class PhysicsWorld extends Trait {
 			var ud1 = contact_list._b1 != null ? contact_list._b1.userData : null;
 			var ud2 = contact_list._b2 != null ? contact_list._b2.userData : null;
 
-			// Characters are not part of rbMap.
+			// Characters keep their own contacts, which their moves also add to.
+			if (!contact_list._shouldBeSkipped && contact_list.isTouching()) {
+				if (Std.isOfType(ud1, KinematicCharacterController) && Std.isOfType(ud2, RigidBody)) {
+					@:privateAccess (ud1: KinematicCharacterController).touch(ud2);
+				}
+				else if (Std.isOfType(ud2, KinematicCharacterController) && Std.isOfType(ud1, RigidBody)) {
+					@:privateAccess (ud2: KinematicCharacterController).touch(ud1);
+				}
+			}
+
 			if (Std.isOfType(ud1, RigidBody) && Std.isOfType(ud2, RigidBody)) {
 				var b1: RigidBody = cast ud1;
 				var b2: RigidBody = cast ud2;
