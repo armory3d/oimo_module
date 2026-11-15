@@ -68,6 +68,7 @@ class PhysicsWorld extends Trait {
 
 	public static var active: PhysicsWorld = null;
 	public static var nextId: Int = 0;
+	static var sceneRemoved = false;
 	public var world: oimo.dynamics.World;
 	public var rbMap: Map<Int, RigidBody>;
 	public var charMap: Map<Int, KinematicCharacterController>;
@@ -99,6 +100,10 @@ class PhysicsWorld extends Trait {
 	public function new(timeScale = 1.0, maxSteps = 10, solverIterations = 10, fixedStep = 1 / 60, debugDrawMode: DebugDrawMode = NoDebug) {
 		super();
 
+		// Scene spawn
+		if (active != null && !sceneRemoved) return;
+		sceneRemoved = false;
+
 		this.timeScale = timeScale;
 		Time.initFixedStep(fixedStep);
 
@@ -126,6 +131,10 @@ class PhysicsWorld extends Trait {
 		@:privateAccess iron.App.traitFixedUpdates.insert(0, fixedUpdate);
 
 		setDebugDrawMode(debugDrawMode);
+
+		iron.Scene.active.notifyOnRemove(function() {
+			sceneRemoved = true;
+		});
 	}
 
 	public function reset() {
